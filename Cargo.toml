@@ -1,0 +1,12 @@
+[package]
+name = "meta-life-3"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+ggez = "0.7.0"
+glam = "0.20.5"
+lru = "0.8.0"
+weak-table = "0.3.2"
