@@ -6,10 +6,19 @@ use lru::LruCache;
 use weak_table::WeakHashSet;
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
-struct State(u32);
+struct State(bool);
 impl State {
-    fn zero() -> Self {
-        Self(0)
+    fn from_alive(alive: bool) -> Self {
+        Self(alive)
+    }
+    fn from_dead(dead: bool) -> Self {
+        Self(!dead)
+    }
+    fn dead() -> Self {
+        Self(false)
+    }
+    fn alive() -> Self {
+        Self(true)
     }
     fn step(
         nw: Self,
@@ -22,12 +31,35 @@ impl State {
         s: Self,
         se: Self,
     ) -> Self {
-        todo!()
+        let total = nw.as_u8()
+            + n.as_u8()
+            + ne.as_u8()
+            + w.as_u8()
+            + e.as_u8()
+            + sw.as_u8()
+            + s.as_u8()
+            + se.as_u8();
+        let alive = if c.0 {
+            total == 2 || total == 3
+        } else {
+            total == 3
+        };
+        Self(alive)
+    }
+    fn is_alive(&self) -> bool {
+        self.0
+    }
+    fn is_dead(&self) -> bool {
+        !self.0
+    }
+    fn as_u8(&self) -> u8 {
+        self.0 as u8
     }
 }
 
 const MAX_DEPTH: u8 = 63;
 const MAX_STEPS: u64 = 1 << 62;
+const LRU_CACHE_SIZE: NonZeroUsize = NonZeroUsize::new(1 << 24).unwrap();
 
 fn depth_to_max_steps(depth: u8) -> u64 {
     assert!(
@@ -42,26 +74,20 @@ fn depth_to_max_steps(depth: u8) -> u64 {
         1 << (depth - 1)
     }
 }
-fn steps_to_min_depth(steps: u64) -> u8 {
+fn steps_to_min_depth(steps: NonZeroU64) -> u8 {
     assert!(
-        steps <= MAX_STEPS,
+        steps.get() <= MAX_STEPS,
         "steps {} must be <= {}",
         steps,
         MAX_STEPS
     );
-    match NonZeroU64::new(steps) {
-        None => 0,
-        Some(steps) => {
-            if steps.is_power_of_two() {
-                steps.ilog2() as u8 + 1
-            } else {
-                steps.ilog2() as u8 + 2
-            }
-        }
+    if steps.is_power_of_two() {
+        steps.ilog2() as u8 + 1
+    } else {
+        steps.ilog2() as u8 + 2
     }
 }
 // the absolute limit on width is 2^64, which is not representable
-// where as half_width is representable and is often more useful
 fn depth_to_half_width(depth: u8) -> u64 {
     assert!(
         depth <= MAX_DEPTH,
@@ -80,16 +106,16 @@ fn half_width_to_depth(half_width: u64) -> u8 {
     half_width.ilog2() as u8
 }
 
-#[derive(Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
 enum Node {
     Leaf(LeafNode),
-    Inner(InnerNode),
+    Inner(NonZeroU8, InnerNode),
 }
 impl Node {
     fn depth(&self) -> u8 {
         match self {
             Self::Leaf(_) => 0,
-            Self::Inner(inner) => inner.depth.get(),
+            Self::Inner(depth, _) => depth.get(),
         }
     }
     fn max_steps(&self) -> u64 {
@@ -99,24 +125,22 @@ impl Node {
         depth_to_half_width(self.depth())
     }
 
-    fn leaf(&self) -> Result<&LeafNode, &InnerNode> {
+    fn leaf(&self) -> Option<&LeafNode> {
         match self {
-            Self::Leaf(leaf) => Ok(leaf),
-            Self::Inner(inner) => Err(inner),
+            Self::Leaf(leaf) => Some(leaf),
+            Self::Inner(_, _) => None,
         }
     }
-    fn inner(&self) -> Result<&InnerNode, &LeafNode> {
+    fn inner(&self) -> Option<&InnerNode> {
         match self {
-            Self::Leaf(leaf) => Err(leaf),
-            Self::Inner(inner) => Ok(inner),
+            Self::Leaf(_) => None,
+            Self::Inner(_, inner) => Some(inner),
         }
     }
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 struct LeafNode {
-    // these could be made into Rc<StateBlock> or something
-    // to allow for efficient leaf representations
     nw: State,
     ne: State,
     sw: State,
@@ -126,32 +150,10 @@ impl LeafNode {
     fn new(nw: State, ne: State, sw: State, se: State) -> Self {
         Self { nw, ne, sw, se }
     }
-
-    fn center(nw: &Self, ne: &Self, sw: &Self, se: &Self) -> Self {
-        Self::new(nw.se, ne.sw, sw.ne, se.nw)
-    }
-
-    fn step_4(nw: &Self, ne: &Self, sw: &Self, se: &Self) -> Self {
-        Self::new(
-            State::step(
-                nw.nw, nw.ne, ne.nw, nw.sw, nw.se, ne.sw, sw.nw, sw.ne, se.nw,
-            ),
-            State::step(
-                nw.ne, ne.nw, ne.ne, nw.se, ne.sw, ne.se, sw.ne, se.nw, se.ne,
-            ),
-            State::step(
-                nw.sw, nw.se, ne.sw, sw.ne, sw.ne, se.nw, sw.sw, sw.se, se.sw,
-            ),
-            State::step(
-                nw.se, ne.sw, ne.se, sw.ne, se.nw, se.ne, sw.se, se.sw, se.se,
-            ),
-        )
-    }
 }
 
 #[derive(Clone, Eq)]
 struct InnerNode {
-    depth: NonZeroU8,
     nw: Rc<Node>,
     ne: Rc<Node>,
     sw: Rc<Node>,
@@ -159,37 +161,12 @@ struct InnerNode {
 }
 impl InnerNode {
     fn new(nw: Rc<Node>, ne: Rc<Node>, sw: Rc<Node>, se: Rc<Node>) -> Self {
-        let child_depth = nw.depth();
-        assert_eq!(ne.depth(), child_depth);
-        assert_eq!(sw.depth(), child_depth);
-        assert_eq!(se.depth(), child_depth);
-        let depth = child_depth + 1;
-        assert!(depth <= 63, "depth too large");
-        Self {
-            depth: NonZeroU8::new(depth).unwrap(),
-            nw,
-            ne,
-            sw,
-            se,
-        }
-    }
-
-    fn center(nw: &Self, ne: &Self, sw: &Self, se: &Self) -> Self {
-        Self::new(nw.se.clone(), ne.sw.clone(), sw.ne.clone(), se.nw.clone())
-    }
-
-    fn max_steps(&self) -> u64 {
-        depth_to_max_steps(self.depth.get())
-    }
-    fn half_width(&self) -> u64 {
-        depth_to_half_width(self.depth.get())
+        Self { nw, ne, sw, se }
     }
 }
 impl PartialEq for InnerNode {
     fn eq(&self, other: &Self) -> bool {
-        // probably possible to ignore depth, but not doing so for now
-        self.depth == other.depth
-            && Rc::ptr_eq(&self.nw, &other.nw)
+        Rc::ptr_eq(&self.nw, &other.nw)
             && Rc::ptr_eq(&self.ne, &other.ne)
             && Rc::ptr_eq(&self.sw, &other.sw)
             && Rc::ptr_eq(&self.se, &other.se)
@@ -197,7 +174,6 @@ impl PartialEq for InnerNode {
 }
 impl std::hash::Hash for InnerNode {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.depth.hash(state);
         std::ptr::hash(self.nw.as_ref(), state);
         std::ptr::hash(self.ne.as_ref(), state);
         std::ptr::hash(self.sw.as_ref(), state);
@@ -208,24 +184,32 @@ impl std::fmt::Debug for InnerNode {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "Inner {{ depth: {:?}, nw: {:p}, ne: {:p}, sw: {:p}, se: {:p} }}",
-            self.depth, self.nw, self.ne, self.sw, self.se
+            "Inner {{ nw: {:p}, ne: {:p}, sw: {:p}, se: {:p} }}",
+            self.nw, self.ne, self.sw, self.se
         )
     }
 }
-struct NodeCache {
+pub struct NodeCache {
+    zeros: Vec<Rc<Node>>,
     state_cache: WeakHashSet<Weak<Node>>,
     step_cache: LruCache<(Rc<Node>, NonZeroU64), Rc<Node>>,
 }
 impl NodeCache {
-    fn new(cap: NonZeroUsize) -> Self {
-        Self {
+    pub fn new() -> Self {
+        let mut this = Self {
+            zeros: Vec::with_capacity(MAX_DEPTH.into()),
             state_cache: WeakHashSet::new(),
-            step_cache: LruCache::new(cap),
+            step_cache: LruCache::new(LRU_CACHE_SIZE),
+        };
+
+        let mut zero = this.leaf(State::dead(), State::dead(), State::dead(), State::dead());
+        while this.zeros.len() < MAX_DEPTH.into() {
+            this.zeros.push(zero.clone());
+            zero = this.inner(zero.clone(), zero.clone(), zero.clone(), zero.clone());
         }
-    }
-    fn set_cap(&mut self, cap: NonZeroUsize) {
-        self.step_cache.resize(cap)
+        this.zeros.push(zero);
+
+        this
     }
 
     fn intern(&mut self, node: Node) -> Rc<Node> {
@@ -235,34 +219,35 @@ impl NodeCache {
             node
         })
     }
-    fn zero(&mut self, depth: u8) -> Rc<Node> {
-        if depth == 0 {
-            self.leaf(State::zero(), State::zero(), State::zero(), State::zero())
-        } else {
-            let sub = self.zero(depth - 1);
-            self.inner(sub.clone(), sub.clone(), sub.clone(), sub)
-        }
-    }
     fn leaf(&mut self, nw: State, ne: State, sw: State, se: State) -> Rc<Node> {
         self.intern(Node::Leaf(LeafNode::new(nw, ne, sw, se)))
     }
     fn inner(&mut self, nw: Rc<Node>, ne: Rc<Node>, sw: Rc<Node>, se: Rc<Node>) -> Rc<Node> {
-        self.intern(Node::Inner(InnerNode::new(nw, ne, sw, se)))
+        let child_depth = nw.depth();
+        assert_eq!(ne.depth(), child_depth);
+        assert_eq!(sw.depth(), child_depth);
+        assert_eq!(se.depth(), child_depth);
+        let depth = NonZeroU8::new(nw.depth() + 1).unwrap();
+        self.intern(Node::Inner(depth, InnerNode::new(nw, ne, sw, se)))
+    }
+    fn zero(&self, depth: u8) -> &Rc<Node> {
+        &self.zeros[usize::from(depth)]
+    }
+    fn is_zero(&self, node: &Rc<Node>) -> bool {
+        Rc::ptr_eq(node, self.zero(node.depth()))
     }
 
     fn step_root(&mut self, node: Rc<Node>, steps: u64) -> Rc<Node> {
         match NonZeroU64::new(steps) {
             None => node,
             Some(steps) => {
-                let z = self.zero(node.depth());
-                // this is the right idea, but may need to expand more than once
-                // start by doing self.center_4(...) for each
-                // then nw = self.inner(z, z, z, nw) for each (noting that z must grow each iteration)
-                let nw = self.step_4_positive(z.clone(), z.clone(), z.clone(), node.clone(), steps);
-                let ne = self.step_4_positive(z.clone(), z.clone(), node.clone(), z.clone(), steps);
-                let sw = self.step_4_positive(z.clone(), node.clone(), z.clone(), z.clone(), steps);
-                let se = self.step_4_positive(node, z.clone(), z.clone(), z, steps);
-                self.inner(nw, ne, sw, se)
+                // step will reduce the area of the node, but also the unbuffered node will grow up to the same amount
+                // so we need 2 buffer nodes that are both >= min_depth
+                // which we do by unbuffering given node so it is >= min_depth - 1
+                let min_depth = steps_to_min_depth(steps);
+                let depth = self.unbufferd_depth(&node, min_depth.saturating_sub(1)) + 2;
+                let node = self.buffer(node, depth);
+                self.step_positive(node, steps)
             }
         }
     }
@@ -276,8 +261,8 @@ impl NodeCache {
 
     fn step_positive(&mut self, node: Rc<Node>, steps: NonZeroU64) -> Rc<Node> {
         // annoying to have to node.clone() here
-        // but .get just takes borrow and not any other type of equivalence
-        // in particularit isn't necessary if it isn't wrapped up in a tuple with steps
+        // but .get just takes Borrow and not any other type of equivalence
+        // in particular this isn't necessary if it isn't wrapped up in a tuple with steps
         self.step_cache
             .get(&(node.clone(), steps))
             .cloned()
@@ -289,16 +274,30 @@ impl NodeCache {
     }
 
     fn step_impl(&mut self, node: &Rc<Node>, steps: NonZeroU64) -> Rc<Node> {
-        let node = node.inner().expect("can't step a leaf");
         let max_steps = node.max_steps();
         assert!(steps.get() <= max_steps);
+        let node = node.inner().unwrap();
         // max_steps can't be 0, just assuming <= 1 will optimize better than == 1
         if max_steps <= 1 {
             let nw = node.nw.leaf().unwrap();
             let ne = node.ne.leaf().unwrap();
             let sw = node.sw.leaf().unwrap();
             let se = node.se.leaf().unwrap();
-            self.intern(Node::Leaf(LeafNode::step_4(nw, ne, sw, se)))
+
+            let nw2 = State::step(
+                nw.nw, nw.ne, ne.nw, nw.sw, nw.se, ne.sw, sw.nw, sw.ne, se.nw,
+            );
+            let ne2 = State::step(
+                nw.ne, ne.nw, ne.ne, nw.se, ne.sw, ne.se, sw.ne, se.nw, se.ne,
+            );
+            let sw2 = State::step(
+                nw.sw, nw.se, ne.sw, sw.ne, sw.ne, se.nw, sw.sw, sw.se, se.sw,
+            );
+            let se2 = State::step(
+                nw.se, ne.sw, ne.se, sw.ne, se.nw, se.ne, sw.se, se.sw, se.se,
+            );
+
+            self.leaf(nw2, ne2, sw2, se2)
         } else {
             let nw = node.nw.inner().unwrap();
             let ne = node.ne.inner().unwrap();
@@ -356,17 +355,145 @@ impl NodeCache {
     }
 
     fn center(&mut self, node: &Rc<Node>) -> Rc<Node> {
-        let node = node.inner().expect("can't get the center of a leaf");
+        let node = node.inner().unwrap();
         self.center_4(&node.nw, &node.ne, &node.sw, &node.se)
     }
 
     fn center_4(&mut self, nw: &Rc<Node>, ne: &Rc<Node>, sw: &Rc<Node>, se: &Rc<Node>) -> Rc<Node> {
         match (nw.as_ref(), ne.as_ref(), sw.as_ref(), se.as_ref()) {
             (Node::Leaf(nw), Node::Leaf(ne), Node::Leaf(sw), Node::Leaf(se)) => {
-                self.intern(Node::Leaf(LeafNode::center(nw, ne, sw, se)))
+                self.leaf(nw.se, ne.sw, sw.ne, se.nw)
             }
-            (Node::Inner(nw), Node::Inner(ne), Node::Inner(sw), Node::Inner(se)) => {
-                self.intern(Node::Inner(InnerNode::center(nw, ne, sw, se)))
+            (Node::Inner(_, nw), Node::Inner(_, ne), Node::Inner(_, sw), Node::Inner(_, se)) => {
+                self.inner(nw.se.clone(), ne.sw.clone(), sw.ne.clone(), se.nw.clone())
+            }
+            _ => panic!("inconsistent node depth"),
+        }
+    }
+
+    fn buffer(&mut self, node: Rc<Node>, to_depth: u8) -> Rc<Node> {
+        let node_depth = node.depth();
+        match node_depth.cmp(&to_depth) {
+            std::cmp::Ordering::Equal => node,
+            std::cmp::Ordering::Greater => {
+                let InnerNode { nw, ne, sw, se } = &node.inner().unwrap();
+                self.shrink_4(nw, ne, sw, se, to_depth)
+            }
+            std::cmp::Ordering::Less => {
+                let InnerNode { nw, ne, sw, se } = node.inner().unwrap().clone();
+                self.expand_4(nw, ne, sw, se, to_depth)
+            }
+        }
+    }
+    fn shrink_4(
+        &mut self,
+        nw: &Rc<Node>,
+        ne: &Rc<Node>,
+        sw: &Rc<Node>,
+        se: &Rc<Node>,
+        to_depth: u8,
+    ) -> Rc<Node> {
+        if nw.depth() == to_depth {
+            self.center_4(nw, ne, sw, se)
+        } else {
+            let nw = &nw.inner().unwrap().se;
+            let ne = &ne.inner().unwrap().sw;
+            let sw = &sw.inner().unwrap().ne;
+            let se = &se.inner().unwrap().nw;
+            self.shrink_4(nw, ne, sw, se, to_depth)
+        }
+    }
+    fn expand_4(
+        &mut self,
+        nw: Rc<Node>,
+        ne: Rc<Node>,
+        sw: Rc<Node>,
+        se: Rc<Node>,
+        to_depth: u8,
+    ) -> Rc<Node> {
+        if nw.depth() + 1 == to_depth {
+            self.inner(nw, ne, sw, se)
+        } else {
+            let zero = self.zero(nw.depth()).clone();
+            let nw = self.inner(zero.clone(), zero.clone(), zero.clone(), nw);
+            let ne = self.inner(zero.clone(), zero.clone(), ne, zero.clone());
+            let sw = self.inner(zero.clone(), sw, zero.clone(), zero.clone());
+            let se = self.inner(se, zero.clone(), zero.clone(), zero);
+            self.expand_4(nw, ne, sw, se, to_depth)
+        }
+    }
+
+    // find the smallest depth where the node is unbuffered, maxed with target_depth
+    fn unbufferd_depth(&self, node: &Rc<Node>, target_depth: u8) -> u8 {
+        let node_depth = node.depth();
+        if node_depth <= target_depth {
+            return target_depth;
+        }
+
+        let InnerNode { nw, ne, sw, se } = &node.inner().unwrap();
+        self.unbufferd_depth_4(nw, ne, sw, se, target_depth)
+    }
+    fn unbufferd_depth_4(
+        &self,
+        nw: &Rc<Node>,
+        ne: &Rc<Node>,
+        sw: &Rc<Node>,
+        se: &Rc<Node>,
+        target_depth: u8,
+    ) -> u8 {
+        let child_depth = nw.depth();
+        if child_depth < target_depth {
+            target_depth
+        } else if self.is_buffered(nw, ne, sw, se) {
+            match (nw.as_ref(), ne.as_ref(), sw.as_ref(), se.as_ref()) {
+                (
+                    Node::Inner(_, nw),
+                    Node::Inner(_, ne),
+                    Node::Inner(_, sw),
+                    Node::Inner(_, se),
+                ) => self.unbufferd_depth_4(&nw.se, &ne.sw, &sw.ne, &se.nw, target_depth),
+                _ => child_depth,
+            }
+        } else {
+            child_depth
+        }
+    }
+
+    fn is_buffered(&self, nw: &Rc<Node>, ne: &Rc<Node>, sw: &Rc<Node>, se: &Rc<Node>) -> bool {
+        match (nw.as_ref(), ne.as_ref(), sw.as_ref(), se.as_ref()) {
+            (Node::Leaf(nw), Node::Leaf(ne), Node::Leaf(sw), Node::Leaf(se)) => {
+                nw.nw.is_dead()
+                    && nw.ne.is_dead()
+                    && nw.sw.is_dead()
+                    && ne.nw.is_dead()
+                    && ne.ne.is_dead()
+                    && ne.se.is_dead()
+                    && sw.nw.is_dead()
+                    && sw.sw.is_dead()
+                    && sw.se.is_dead()
+                    && se.ne.is_dead()
+                    && se.sw.is_dead()
+                    && se.se.is_dead()
+            }
+            (
+                Node::Inner(depth, nw),
+                Node::Inner(_, ne),
+                Node::Inner(_, sw),
+                Node::Inner(_, se),
+            ) => {
+                let zero = self.zero(depth.get() - 1);
+                Rc::ptr_eq(&nw.nw, zero)
+                    && Rc::ptr_eq(&nw.ne, zero)
+                    && Rc::ptr_eq(&nw.sw, zero)
+                    && Rc::ptr_eq(&ne.nw, zero)
+                    && Rc::ptr_eq(&ne.ne, zero)
+                    && Rc::ptr_eq(&ne.se, zero)
+                    && Rc::ptr_eq(&sw.nw, zero)
+                    && Rc::ptr_eq(&sw.sw, zero)
+                    && Rc::ptr_eq(&sw.se, zero)
+                    && Rc::ptr_eq(&se.ne, zero)
+                    && Rc::ptr_eq(&se.sw, zero)
+                    && Rc::ptr_eq(&se.se, zero)
             }
             _ => panic!("inconsistent node depth"),
         }

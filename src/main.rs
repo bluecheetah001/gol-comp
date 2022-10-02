@@ -1,30 +1,24 @@
 #![feature(int_log)]
+// #![feature(let_chains)]
+#![feature(const_option)]
 
 use ggez::event;
 use ggez::graphics::{self, Color};
 use ggez::{Context, GameResult};
 use glam::*;
 
-use board::{Board, Pos, State};
-
 mod basic;
-mod board;
-mod macrocell;
 
 struct GlobalState {
     pos_x: f32,
-    board: Board,
+    cache: basic::NodeCache,
 }
 
 impl GlobalState {
     fn new() -> GameResult<GlobalState> {
-        let mut board = Board::new();
-        let pos = Pos::new(2, -5);
-        let state = State::new(5);
-        board.set(pos, state);
-        assert_eq!(board.get(pos), state);
+        let cache = basic::NodeCache::new();
 
-        Ok(GlobalState { pos_x: 0.0, board })
+        Ok(GlobalState { pos_x: 0.0, cache })
     }
 }
 
