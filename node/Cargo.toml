@@ -1,0 +1,19 @@
+[package]
+name = "node"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[features]
+bit_twiddle = []
+
+[dependencies]
+either = "1.8.0"
+itertools = "0.10.5"
+lru = "0.10.0"
+proptest = "1.0.0"
+weak-table = "0.3.2"
+
+[dev-dependencies]
+unindent = "0.2.0"
