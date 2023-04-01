@@ -13,8 +13,10 @@ mod pos;
 mod quad;
 mod ops {
     // mod get;
+    mod bit;
     mod center;
     mod children;
+    mod get;
     mod mc_format;
     mod population;
     mod step;
@@ -25,7 +27,8 @@ mod ops {
     pub use test_format::*;
 }
 
-pub use crate::node::Node;
-pub use block::Block;
+pub use crate::node::*;
+pub use block::*;
 pub use ops::*;
-pub use quad::{DepthQuad, Quad};
+pub use pos::*;
+pub use quad::*;

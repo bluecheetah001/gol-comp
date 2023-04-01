@@ -15,7 +15,7 @@ pub enum Quadrant {
     SE,
 }
 impl Quadrant {
-    pub fn from_pos(pos: &Pos) -> Self {
+    pub fn from_pos(pos: Pos) -> Self {
         if pos.y < 0 {
             if pos.x < 0 {
                 Self::NW
@@ -29,6 +29,19 @@ impl Quadrant {
                 Self::SE
             }
         }
+    }
+
+    pub fn is_west(&self) -> bool {
+        matches!(self, Self::NW | Self::SW)
+    }
+    pub fn is_east(&self) -> bool {
+        matches!(self, Self::NE | Self::SE)
+    }
+    pub fn is_north(&self) -> bool {
+        matches!(self, Self::NW | Self::NE)
+    }
+    pub fn is_south(&self) -> bool {
+        matches!(self, Self::SW | Self::SE)
     }
 
     pub fn opposite(&self) -> Self {
@@ -120,14 +133,14 @@ impl<T> Quad<T> {
             se: f(Quadrant::SE, self.se),
         }
     }
-    // pub fn zip_map<U, V>(self, other: Quad<U>, mut f: impl FnMut(T, U) -> V) -> Quad<V> {
-    //     Quad {
-    //         nw: f(self.nw, other.nw),
-    //         ne: f(self.nw, other.nw),
-    //         sw: f(self.nw, other.nw),
-    //         se: f(self.nw, other.nw),
-    //     }
-    // }
+    pub fn zip_map<U, V>(self, other: Quad<U>, mut f: impl FnMut(T, U) -> V) -> Quad<V> {
+        Quad {
+            nw: f(self.nw, other.nw),
+            ne: f(self.ne, other.ne),
+            sw: f(self.sw, other.sw),
+            se: f(self.se, other.se),
+        }
+    }
     // pub fn zip<U>(self, other: Quad<U>) -> Quad<(T, U)> {
     //     self.zip_map(other, |a, b| (a, b))
     // }

@@ -77,41 +77,6 @@ impl Node {
             unbufferd_depth_inner(self.inner().unwrap().clone(), target_depth)
         }
     }
-    fn center_at_depth(&self, depth: u8) -> Node {
-        fn get_smaller(inner: Quad<Node>, depth: u8) -> Node {
-            match inner.children() {
-                DepthQuad::Leaf(leaf) => {
-                    assert_eq!(depth, 0);
-                    leaf.center().into()
-                }
-                DepthQuad::Inner(at_depth, inner) => {
-                    if at_depth.get() == depth {
-                        inner.center().into()
-                    } else {
-                        get_smaller(inner.center(), depth)
-                    }
-                }
-            }
-        }
-        fn get_larger(inner: Quad<Node>, depth: u8) -> Node {
-            let at_depth = inner.nw.depth();
-            if at_depth + 1 == depth {
-                inner.into()
-            } else {
-                get_larger(
-                    inner
-                        .expand(Node::empty(at_depth))
-                        .map(|quad| Node::new_inner(quad)),
-                    depth,
-                )
-            }
-        }
-        match self.depth().cmp(&depth) {
-            std::cmp::Ordering::Less => get_smaller(self.inner().unwrap().clone(), depth),
-            std::cmp::Ordering::Equal => self.clone(),
-            std::cmp::Ordering::Greater => get_larger(self.inner().unwrap().clone(), depth),
-        }
-    }
 }
 impl<T> Quad<Quad<T>>
 where

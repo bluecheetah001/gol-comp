@@ -100,6 +100,9 @@ impl<'n, W: Write> McWriter<'n, W> {
             Some(index) => Ok(*index),
             None if block.is_empty() => Ok(0),
             _ => {
+                // TODO don't need to write trailing empty rows
+                // let rows = block.to_rows_array();
+                // let lead_rows = rows.iter().rev().skip_while(|row| row == 0).rev();
                 for row in block.to_rows_array() {
                     self.write_row(row)?;
                 }
