@@ -5,7 +5,7 @@ use std::io::{Error as IoError, Write};
 
 use either::Either;
 
-use crate::{Block, DepthQuad, Node, Population, Quad};
+use crate::{Block, DepthQuad, Node, Population};
 
 impl Node {
     pub fn write_to(&self, write: impl Write) -> Result<(), IoError> {
@@ -365,7 +365,7 @@ impl<'src> McReader<'src> {
                     return Ok(match self.nodes.pop() {
                         Some(Either::Right(node)) => node,
                         // normalize smaller than node patterns into the smallest node
-                        Some(Either::Left(block)) => Node::new_leaf(block.expand()),
+                        Some(Either::Left(block)) => block.expand().into(),
                         None => Node::empty(0),
                     });
                 }
@@ -387,14 +387,14 @@ impl<'src> McReader<'src> {
             let ne = self.expect_block_ref()?;
             let sw = self.expect_block_ref()?;
             let se = self.expect_block_ref()?;
-            Node::new_leaf(Quad { nw, ne, sw, se })
+            Node::new(nw, ne, sw, se)
         } else {
             let child_depth = size - Node::MIN_WIDTH_LOG2 - 1;
             let nw = self.expect_node_ref(child_depth)?;
             let ne = self.expect_node_ref(child_depth)?;
             let sw = self.expect_node_ref(child_depth)?;
             let se = self.expect_node_ref(child_depth)?;
-            Node::new_inner(Quad { nw, ne, sw, se })
+            Node::new(nw, ne, sw, se)
         };
 
         self.expect_line(
@@ -571,9 +571,7 @@ impl<'src> McReader<'src> {
 mod test {
     use unindent::unindent;
 
-    use crate::block::Block;
-    use crate::node::Node;
-    use crate::quad::Quad;
+    use crate::{Block, Node};
 
     fn assert_node_fmt(node: Node, fmt: &str) {
         let mut fmt = unindent(fmt);
@@ -598,24 +596,14 @@ mod test {
         let b2 = Block::from_rows(0x00_00_00_00_00_00_00_01);
         let b3 = Block::from_rows(0x80_40_20_10_08_04_02_01);
         assert_node_fmt(
-            Node::new_leaf(Quad {
-                nw: b1,
-                ne: b1,
-                sw: b1,
-                se: b1,
-            }),
+            Node::new(b1, b1, b1, b1),
             "
                 *$$$$$$$$
                 4 1 1 1 1
             ",
         );
         assert_node_fmt(
-            Node::new_leaf(Quad {
-                nw: b0,
-                ne: b1,
-                sw: b2,
-                se: b3,
-            }),
+            Node::new(b0, b1, b2, b3),
             "
                 *$$$$$$$$
                 $$$$$$$.......*$

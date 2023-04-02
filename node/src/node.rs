@@ -23,7 +23,7 @@ impl Node {
     pub(crate) const MIN_WIDTH_LOG2: u8 = Block::WIDTH_LOG2 + 1;
     pub(crate) const MAX_DEPTH: u8 = Node::MAX_WIDTH_LOG2 - Node::MIN_WIDTH_LOG2;
 
-    pub fn new(data: DepthQuad<Block, Node>) -> Self {
+    fn new_impl(data: DepthQuad<Block, Node>) -> Self {
         assert!(data.depth() <= Node::MAX_DEPTH);
         NODE_CACHE.with_borrow_mut(|node_cache| {
             node_cache.get(&data).unwrap_or_else(|| {
@@ -35,15 +35,21 @@ impl Node {
             })
         })
     }
+    pub fn new<T>(nw: T, ne: T, sw: T, se: T) -> Self
+    where
+        Self: From<Quad<T>>,
+    {
+        Self::from(Quad { nw, ne, sw, se })
+    }
     pub fn new_leaf(data: Quad<Block>) -> Self {
-        Self::new(DepthQuad::Leaf(data))
+        Self::new_impl(DepthQuad::Leaf(data))
     }
     pub fn new_inner(data: Quad<Node>) -> Self {
         let depth = NonZeroU8::new(data.nw.depth() + 1).unwrap();
         Self::new_depth_inner(depth, data)
     }
     pub fn new_depth_inner(depth: NonZeroU8, data: Quad<Node>) -> Self {
-        Self::new(DepthQuad::Inner(depth, data))
+        Self::new_impl(DepthQuad::Inner(depth, data))
     }
     pub fn empty(depth: u8) -> Self {
         assert!(depth <= Node::MAX_DEPTH);
@@ -55,7 +61,7 @@ impl Node {
 }
 impl From<DepthQuad<Block, Node>> for Node {
     fn from(data: DepthQuad<Block, Node>) -> Self {
-        Self::new(data)
+        Self::new_impl(data)
     }
 }
 impl From<Quad<Block>> for Node {
@@ -70,20 +76,20 @@ impl From<Quad<Node>> for Node {
 }
 
 fn gen_empty_nodes() -> Vec<Node> {
-    let empty_leaf = Node::new_leaf(Quad {
-        nw: Block::empty(),
-        ne: Block::empty(),
-        sw: Block::empty(),
-        se: Block::empty(),
-    });
+    let empty_leaf = Node::new(
+        Block::empty(),
+        Block::empty(),
+        Block::empty(),
+        Block::empty(),
+    );
     std::iter::successors(Some(empty_leaf), |empty| {
         if empty.depth() < Node::MAX_DEPTH {
-            Some(Node::new_inner(Quad {
-                nw: empty.clone(),
-                ne: empty.clone(),
-                sw: empty.clone(),
-                se: empty.clone(),
-            }))
+            Some(Node::new(
+                empty.clone(),
+                empty.clone(),
+                empty.clone(),
+                empty.clone(),
+            ))
         } else {
             None
         }
@@ -146,7 +152,28 @@ impl Hash for Node {
 }
 impl std::fmt::Debug for Node {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Node( {:p} )", self.as_ref())
+        match self.depth_quad() {
+            DepthQuad::Leaf(leaf) => f
+                .debug_struct("Node")
+                .field("id", &format_args!("{:p}", self.as_ref()))
+                .field("depth", &0_u8)
+                .field("nw", &leaf.nw)
+                .field("ne", &leaf.ne)
+                .field("sw", &leaf.sw)
+                .field("se", &leaf.se)
+                .finish(),
+            DepthQuad::Inner(depth, inner) => f
+                .debug_struct("Node")
+                .field("id", &format_args!("{:p}", self.as_ref()))
+                .field("depth", depth)
+                .field("nw", &format_args!("Node({:p})", inner.nw.as_ref()))
+                .field("ne", &format_args!("Node({:p})", inner.ne.as_ref()))
+                .field("sw", &format_args!("Node({:p})", inner.sw.as_ref()))
+                .field("se", &format_args!("Node({:p})", inner.se.as_ref()))
+                .finish(),
+        }
+        // TODO could be a lot better, but not sure what exactly would be helpful
+        // write!(f, "Node({:p})", self.as_ref())
     }
 }
 

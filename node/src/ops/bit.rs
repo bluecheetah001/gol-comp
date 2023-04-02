@@ -19,7 +19,7 @@ impl Node {
         } else {
             match (self.depth_quad(), rhs.depth_quad()) {
                 (crate::DepthQuad::Leaf(lhs), crate::DepthQuad::Leaf(rhs)) => {
-                    Node::new_leaf(lhs.zip_map(*rhs, |lhs, rhs| lhs | rhs))
+                    lhs.zip_map(*rhs, |lhs, rhs| lhs | rhs).into()
                 }
                 (crate::DepthQuad::Inner(depth, lhs), crate::DepthQuad::Inner(_, rhs)) => {
                     Node::new_depth_inner(
@@ -32,50 +32,6 @@ impl Node {
             }
         }
     }
-
-    //     pub fn and(&self, rhs: &Node) -> Node {
-    //         if self.depth() < rhs.depth() {
-    //             bitand_impl(self, &rhs.center_at_depth(self.depth()))
-    //         } else {
-    //             bitand_impl(&self.center_at_depth(rhs.depth()), rhs)
-    //         }
-    //     }
-    //     fn and_impl(&self, rhs: &Node) -> Node {
-    //         if self.is_empty() {
-    //             self.clone()
-    //         } else if rhs.is_empty() {
-    //             rhs.clone()
-    //         } else {
-    //             match (self.depth_quad(), rhs.depth_quad()) {
-    //                 (crate::DepthQuad::Leaf(lhs), crate::DepthQuad::Leaf(rhs)) => {
-    //                     Node::new_leaf(lhs.zip_map(*rhs, |lsh, rhs| lsh & rhs))
-    //                 }
-    //                 (crate::DepthQuad::Inner(depth, lhs), crate::DepthQuad::Inner(_, rhs)) => {
-    //                     Node::new_depth_inner(*depth, lhs.as_ref().zip_map(rhs.as_ref(), bitand_impl))
-    //                 }
-    //                 _ => panic!("inconsistent depth"),
-    //             }
-    //         }
-    //     }
-
-    //     pub fn and_not(&self, rhs:&Node)->Node{
-    //         self.and_not_impl(rhs.center_at_depth(self.depth()))
-    //     }
-    //     fn and_impl(&self, rhs: &Node) -> Node {
-    //         if self.is_empty() || rhs.is_empty(){
-    //             self.clone()
-    //         } else {
-    //             match (self.depth_quad(), rhs.depth_quad()) {
-    //                 (crate::DepthQuad::Leaf(lhs), crate::DepthQuad::Leaf(rhs)) => {
-    //                     todo!()
-    //                 }
-    //                 (crate::DepthQuad::Inner(depth, lhs), crate::DepthQuad::Inner(_, rhs)) => {
-    //                     todo!()
-    //                 }
-    //                 _ => panic!("inconsistent depth"),
-    //             }
-    //         }
-    //     }
 }
 
 impl BitOr for Block {

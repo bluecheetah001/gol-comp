@@ -11,3 +11,5 @@ lru = "0.10.0"
 itertools = "0.10.5"
 node = { path = "../node" }
 bit-iter = "1.1.1"
+tracing = "0.1.37"
+tracing-subscriber = { version = "0.3.16", features = ["time"] }

@@ -1,19 +1,19 @@
 use std::fmt::Debug;
 
-use crate::quad::Quad;
-
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 /// An 8x8 block of cells
 ///
 /// # implementation details
 /// stored in row-major format (see [Block::from_rows()])
-pub struct Block(u64);
+pub struct Block {
+    bits: u64,
+}
 impl Block {
     pub const WIDTH_LOG2: u8 = 3;
     pub const WIDTH: u64 = 1 << Block::WIDTH_LOG2;
 
     pub fn empty() -> Self {
-        Self(0)
+        Self { bits: 0 }
     }
     /// constructs a block from a row-major sequence of bits
     ///
@@ -27,10 +27,10 @@ impl Block {
     /// 07 06 .. 00
     /// ```
     pub fn from_rows(bits: u64) -> Self {
-        Self(bits)
+        Self { bits }
     }
     pub fn to_rows(self) -> u64 {
-        self.0
+        self.bits
     }
     /// constructs a block from a row-major sequence of bits
     ///
@@ -44,18 +44,10 @@ impl Block {
     /// 7,7 7,6 .. 7,0
     /// ```
     pub fn from_rows_array(rows: [u8; 8]) -> Self {
-        Self(u64::from_be_bytes(rows))
+        Self::from_rows(u64::from_be_bytes(rows))
     }
     pub fn to_rows_array(self) -> [u8; 8] {
-        self.0.to_be_bytes()
-    }
-    // TODO I don't think this is ever needed other than test...
-    pub fn expand(&self) -> Quad<Block> {
-        let nw = Block((self.0 & 0xf0_f0_f0_f0_00_00_00_00) >> (4 * 8 + 4));
-        let ne = Block((self.0 & 0x0f_0f_0f_0f_00_00_00_00) >> (4 * 8 - 4));
-        let sw = Block((self.0 & 0x00_00_00_00_f0_f0_f0_f0) << (4 * 8 - 4));
-        let se = Block((self.0 & 0x00_00_00_00_0f_0f_0f_0f) << (4 * 8 + 4));
-        Quad { nw, ne, sw, se }
+        self.to_rows().to_be_bytes()
     }
 }
 impl Debug for Block {

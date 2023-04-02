@@ -10,10 +10,13 @@ use std::fs;
 use eframe::egui;
 use image::with_image;
 use node::{Node, Population, Pos, Quadrant};
+use tracing_subscriber::fmt::format::FmtSpan;
 
 fn main() -> Result<(), eframe::Error> {
     // Log to stdout (if you run with `RUST_LOG=debug`).
-    // tracing_subscriber::fmt::init();
+    tracing_subscriber::fmt()
+        .with_span_events(FmtSpan::CLOSE)
+        .init();
 
     let options = eframe::NativeOptions {
         initial_window_size: Some(egui::vec2(1000.0, 1000.0)),
@@ -43,10 +46,11 @@ impl Default for MyApp {
 
 impl eframe::App for MyApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        // self.board.node = self.board.node.step(1);
+        self.board.node = self.board.node.step(1);
         egui::CentralPanel::default().show(ctx, |ui| {
             ui.add(&mut self.board);
         });
+        ctx.request_repaint();
     }
 }
 

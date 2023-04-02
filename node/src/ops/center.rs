@@ -6,15 +6,11 @@ impl Node {
     // TODO center_at_depth is more efficnet if you can determine the goal depth ahead of time
     pub(crate) fn expand(&self) -> Node {
         match self.depth_quad() {
-            DepthQuad::Leaf(leaf) => leaf.expand(Block::empty()).map(Node::new_leaf).into(),
-            DepthQuad::Inner(depth, inner) => inner
-                .clone()
-                .expand(Node::empty(depth.get() - 1))
-                .map(Node::new_inner)
-                .into(),
+            DepthQuad::Leaf(leaf) => leaf.expand().into(),
+            DepthQuad::Inner(_, inner) => inner.clone().expand().into(),
         }
     }
-    pub fn center_at_depth(&self, depth: u8) -> Node {
+    pub(crate) fn center_at_depth(&self, depth: u8) -> Node {
         fn get_smaller(inner: Quad<Node>, depth: u8) -> Node {
             match inner.children() {
                 DepthQuad::Leaf(leaf) => {
@@ -35,19 +31,17 @@ impl Node {
             if at_depth + 1 == depth {
                 inner.into()
             } else {
-                get_larger(
-                    inner
-                        .expand(Node::empty(at_depth))
-                        .map(|quad| Node::new_inner(quad)),
-                    depth,
-                )
+                get_larger(inner.expand(), depth)
             }
         }
         match self.depth().cmp(&depth) {
-            std::cmp::Ordering::Less => get_smaller(self.inner().unwrap().clone(), depth),
-            std::cmp::Ordering::Equal => self.clone(),
             // TODO handle self at depth 0
-            std::cmp::Ordering::Greater => get_larger(self.inner().unwrap().clone(), depth),
+            std::cmp::Ordering::Less => match self.depth_quad() {
+                DepthQuad::Leaf(leaf) => get_larger(leaf.expand(), depth),
+                DepthQuad::Inner(_, inner) => get_larger(inner.clone(), depth),
+            },
+            std::cmp::Ordering::Equal => self.clone(),
+            std::cmp::Ordering::Greater => get_smaller(self.inner().unwrap().clone(), depth),
         }
     }
 }
@@ -59,17 +53,49 @@ impl Quad<Node> {
             DepthQuad::Inner(depth, inner) => DepthQuad::Inner(depth, inner.center()),
         }
     }
+    pub(crate) fn expand(self) -> Quad<Node> {
+        let empty = Node::empty(self.nw.depth());
+        Quad {
+            nw: Node::new(empty.clone(), empty.clone(), empty.clone(), self.nw),
+            ne: Node::new(empty.clone(), empty.clone(), self.ne, empty.clone()),
+            sw: Node::new(empty.clone(), self.sw, empty.clone(), empty.clone()),
+            se: Node::new(self.se, empty.clone(), empty.clone(), empty),
+        }
+    }
+}
+impl Quad<Block> {
+    pub(crate) fn expand(self) -> Quad<Node> {
+        let empty = Block::empty();
+        Quad {
+            nw: Node::new(empty, empty, empty, self.nw),
+            ne: Node::new(empty, empty, self.ne, empty),
+            sw: Node::new(empty, self.sw, empty, empty),
+            se: Node::new(self.se, empty, empty, empty),
+        }
+    }
 }
 
-// impl Quad<Block> {
-//     pub(crate) fn center(&self) -> Block {
-//         let nw = (self.nw.to_rows() & 0x00_00_00_00_0f_0f_0f_0f) << (4 * 8 + 4);
-//         let ne = (self.ne.to_rows() & 0x00_00_00_00_f0_f0_f0_f0) << (4 * 8 - 4);
-//         let sw = (self.sw.to_rows() & 0x0f_0f_0f_0f_00_00_00_00) >> (4 * 8 - 4);
-//         let se = (self.se.to_rows() & 0xf0_f0_f0_f0_00_00_00_00) >> (4 * 8 + 4);
-//         Block::from_rows(nw | ne | sw | se)
-//     }
-// }
+impl Quad<Block> {
+    #[allow(unused)]
+    pub(crate) fn center(&self) -> Block {
+        let nw = (self.nw.to_rows() & 0x00_00_00_00_0f_0f_0f_0f) << (4 * 8 + 4);
+        let ne = (self.ne.to_rows() & 0x00_00_00_00_f0_f0_f0_f0) << (4 * 8 - 4);
+        let sw = (self.sw.to_rows() & 0x0f_0f_0f_0f_00_00_00_00) >> (4 * 8 - 4);
+        let se = (self.se.to_rows() & 0xf0_f0_f0_f0_00_00_00_00) >> (4 * 8 + 4);
+        Block::from_rows(nw | ne | sw | se)
+    }
+}
+impl Block {
+    // is only used for tests
+    pub(crate) fn expand(&self) -> Quad<Block> {
+        let bits = self.to_rows();
+        let nw = Block::from_rows((bits & 0xf0_f0_f0_f0_00_00_00_00) >> (4 * 8 + 4));
+        let ne = Block::from_rows((bits & 0x0f_0f_0f_0f_00_00_00_00) >> (4 * 8 - 4));
+        let sw = Block::from_rows((bits & 0x00_00_00_00_f0_f0_f0_f0) << (4 * 8 - 4));
+        let se = Block::from_rows((bits & 0x00_00_00_00_0f_0f_0f_0f) << (4 * 8 + 4));
+        Quad { nw, ne, sw, se }
+    }
+}
 
 impl<T> Quad<Quad<T>>
 where
@@ -84,5 +110,36 @@ where
             sw: self.sw.ne.clone(),
             se: self.se.nw.clone(),
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use crate::{Block, Node};
+
+    #[test]
+    fn leaf_center_at() {
+        let b1 = Block::from_rows(0x01_02_04_08_10_20_40_80);
+        let b2 = Block::from_rows(0x80_40_20_10_08_04_02_01);
+        let b3 = Block::from_rows(0x01_01_01_01_01_01_01_01);
+        let b4 = Block::from_rows(0x80_80_80_80_80_80_80_80);
+        let leaf = Node::new(b1, b2, b3, b4);
+        assert_eq!(leaf, leaf.center_at_depth(0));
+        assert_eq!(leaf.expand(), leaf.center_at_depth(1));
+        assert_eq!(leaf.expand().expand(), leaf.center_at_depth(2));
+    }
+
+    #[test]
+    fn node0_center_at() {
+        let b1 = Block::from_rows(0x01_02_04_08_10_20_40_80);
+        let b2 = Block::from_rows(0x80_40_20_10_08_04_02_01);
+        let b3 = Block::from_rows(0x01_01_01_01_01_01_01_01);
+        let b4 = Block::from_rows(0x80_80_80_80_80_80_80_80);
+        let leaf = Node::new(b1, b2, b3, b4);
+        let node = Node::new(leaf.clone(), leaf.clone(), leaf.clone(), leaf);
+        let center = Node::new(b4, b3, b2, b1);
+        assert_eq!(center, node.center_at_depth(0));
+        assert_eq!(node, node.center_at_depth(1));
+        assert_eq!(node.expand(), node.center_at_depth(2));
     }
 }

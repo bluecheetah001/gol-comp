@@ -44,7 +44,7 @@ impl Node {
                     child &= !mask;
                 }
                 leaf[q] = Block::from_rows(child);
-                Node::new_leaf(leaf)
+                Node::from(leaf)
             }
             DepthQuad::Inner(depth, inner) => {
                 let mut inner = inner.clone();

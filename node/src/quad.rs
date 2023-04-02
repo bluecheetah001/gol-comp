@@ -141,40 +141,6 @@ impl<T> Quad<T> {
             se: f(self.se, other.se),
         }
     }
-    // pub fn zip<U>(self, other: Quad<U>) -> Quad<(T, U)> {
-    //     self.zip_map(other, |a, b| (a, b))
-    // }
-    pub fn expand(self, empty: T) -> Quad<Quad<T>>
-    where
-        T: Clone,
-    {
-        Quad {
-            nw: Quad {
-                nw: empty.clone(),
-                ne: empty.clone(),
-                sw: empty.clone(),
-                se: self.nw,
-            },
-            ne: Quad {
-                nw: empty.clone(),
-                ne: empty.clone(),
-                sw: self.ne,
-                se: empty.clone(),
-            },
-            sw: Quad {
-                nw: empty.clone(),
-                ne: self.sw,
-                sw: empty.clone(),
-                se: empty.clone(),
-            },
-            se: Quad {
-                nw: self.se,
-                ne: empty.clone(),
-                sw: empty.clone(),
-                se: empty,
-            },
-        }
-    }
 }
 impl<T> IntoIterator for Quad<T> {
     type Item = T;

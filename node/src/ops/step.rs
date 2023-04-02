@@ -1,6 +1,7 @@
 use lru::LruCache;
 use std::cell::RefCell;
 use std::num::{NonZeroU64, NonZeroUsize};
+use tracing::{debug, debug_span, trace_span};
 
 use crate::{Block, DepthQuad, Node, Population, Quad};
 
@@ -116,6 +117,9 @@ impl Node {
             })
     }
     fn step_center_impl(&self, steps: NonZeroU64, step_cache: &mut StepCache) -> Node {
+        debug!(depth = self.depth(), steps = steps);
+        // let _span = debug_span!("step_center", depth = self.depth(), steps = steps).entered();
+
         let max_steps = depth_to_max_steps(self.depth());
         debug_assert!(steps.get() <= max_steps);
         let first_half_steps = steps.get().saturating_sub(max_steps / 2);
@@ -140,7 +144,7 @@ impl Quad<Node> {
     fn step_center(&self, steps: u64, step_cache: &mut StepCache) -> Node {
         match NonZeroU64::new(steps) {
             None => self.center().into(),
-            Some(steps) => Node::new_inner(self.clone()).step_center(steps, step_cache),
+            Some(steps) => Node::from(self.clone()).step_center(steps, step_cache),
         }
     }
 }
@@ -395,7 +399,7 @@ mod tests {
 
     #[test]
     fn block_still() {
-        let a = test_block! { "
+        let a = test_block! {"
             ........
             ........
             ........
@@ -404,8 +408,8 @@ mod tests {
             ........
             ........
             ........
-            " };
-        let b = test_block! { "
+            "};
+        let b = test_block! {"
             ......o.
             .oo..o.o
             .oo...o.
@@ -414,8 +418,8 @@ mod tests {
             oo...o.o
             o.o..o.o
             .o....o.
-            " };
-        let c = test_block! { "
+            "};
+        let c = test_block! {"
             .oo.....
             o..o....
             o..o....
@@ -424,7 +428,7 @@ mod tests {
             .....o.o
             ....o..o
             .....oo.
-            " };
+            "};
         assert_block_step(a, 1, a);
         assert_block_step(b, 1, b);
         assert_block_step(c, 1, c);
@@ -432,7 +436,7 @@ mod tests {
 
     #[test]
     fn block_blinker_a() {
-        let a = test_block! { "
+        let a = test_block! {"
             ........
             .....ooo
             ....ooo.
@@ -441,8 +445,8 @@ mod tests {
             ........
             ooo.....
             ........
-            " };
-        let b = test_block! { "
+            "};
+        let b = test_block! {"
             ......o.
             ....o..o
             ....o..o
@@ -451,7 +455,7 @@ mod tests {
             .o......
             .o......
             .o......
-            " };
+            "};
         assert_block_step(a, 1, b);
         assert_block_step(a, 2, a);
         assert_block_step(b, 1, a);
@@ -460,7 +464,7 @@ mod tests {
 
     #[test]
     fn block_blinker_b() {
-        let a = test_block! { "
+        let a = test_block! {"
             ..oo....
             ..oo....
             oo......
@@ -469,8 +473,8 @@ mod tests {
             ....o.o.
             ...o....
             ...oo...
-            " };
-        let b = test_block! { "
+            "};
+        let b = test_block! {"
             ..oo....
             ...o....
             o.......
@@ -479,7 +483,7 @@ mod tests {
             ........
             ...o.o..
             ...oo...
-            " };
+            "};
         assert_block_step(a, 1, b);
         assert_block_step(a, 2, a);
         assert_block_step(b, 1, a);
@@ -488,7 +492,7 @@ mod tests {
 
     #[test]
     fn block_jam() {
-        let a = test_block! { "
+        let a = test_block! {"
             .....oo.
             ....o..o
             ..o..o.o
@@ -497,8 +501,8 @@ mod tests {
             .....o..
             ...oo...
             ........
-            " };
-        let b = test_block! { "
+            "};
+        let b = test_block! {"
             .....oo.
             ....o..o
             ...o.o.o
@@ -507,8 +511,8 @@ mod tests {
             ...oo...
             ....o...
             ........
-            " };
-        let c = test_block! { "
+            "};
+        let c = test_block! {"
             .....oo.
             ....o..o
             ...o.o.o
@@ -517,7 +521,7 @@ mod tests {
             ...oo...
             ...oo...
             ........
-            " };
+            "};
         assert_block_step(a, 1, b);
         assert_block_step(a, 2, c);
         assert_block_step(b, 1, c);
@@ -528,7 +532,7 @@ mod tests {
 
     #[test]
     fn block_blinker_on_edge() {
-        let a = test_block! { "
+        let a = test_block! {"
             o....ooo
             o.......
             o.......
@@ -537,8 +541,8 @@ mod tests {
             .......o
             .......o
             ooo....o
-            " };
-        let b = test_block! { "
+            "};
+        let b = test_block! {"
             ......o.
             oo....o.
             ........
@@ -547,8 +551,8 @@ mod tests {
             ........
             .o....oo
             .o......
-            " };
-        let c = test_block! { "
+            "};
+        let c = test_block! {"
             ........
             ........
             ........
@@ -557,7 +561,7 @@ mod tests {
             ........
             ........
             ........
-            " };
+            "};
         assert_block_step(a, 1, b);
         assert_block_step(a, 2, a);
         assert_block_step(b, 1, c);
@@ -565,7 +569,7 @@ mod tests {
 
     #[test]
     fn block_glider() {
-        let a = test_block! { "
+        let a = test_block! {"
             ........
             ........
             ........
@@ -574,8 +578,8 @@ mod tests {
             ....o...
             ........
             ........
-            " };
-        let b = test_block! { "
+            "};
+        let b = test_block! {"
             ........
             ........
             ....o...
@@ -584,8 +588,8 @@ mod tests {
             ........
             ........
             ........
-            " };
-        let c = test_block! { "
+            "};
+        let c = test_block! {"
             ........
             ........
             ...oo...
@@ -594,8 +598,8 @@ mod tests {
             ........
             ........
             ........
-            " };
-        let d = test_block! { "
+            "};
+        let d = test_block! {"
             ........
             ........
             ...oo...
@@ -604,8 +608,8 @@ mod tests {
             ........
             ........
             ........
-            " };
-        let e = test_block! { "
+            "};
+        let e = test_block! {"
             ........
             ........
             ..ooo...
@@ -614,7 +618,7 @@ mod tests {
             ........
             ........
             ........
-            " };
+            "};
         assert_block_step(a, 1, b);
         assert_block_step(a, 2, c);
         assert_block_step(a, 3, d);
@@ -623,7 +627,7 @@ mod tests {
 
     #[test]
     fn block_pentadecathlon() {
-        let a = test_block! { "
+        let a = test_block! {"
             ........
             ........
             oooooooo
@@ -632,8 +636,8 @@ mod tests {
             ........
             ........
             ........
-            " };
-        let b = test_block! { "
+            "};
+        let b = test_block! {"
             ........
             .oooooo.
             o......o
@@ -642,8 +646,8 @@ mod tests {
             .oooooo.
             ........
             ........
-            " };
-        let c = test_block! { "
+            "};
+        let c = test_block! {"
             ..oooo..
             .oooooo.
             oooooooo
@@ -652,8 +656,8 @@ mod tests {
             .oooooo.
             ..oooo..
             ........
-            " };
-        let d = test_block! { "
+            "};
+        let d = test_block! {"
             .o....o.
             o......o
             ........
@@ -662,8 +666,8 @@ mod tests {
             o......o
             .o....o.
             ...oo...
-            " };
-        let e = test_block! { "
+            "};
+        let e = test_block! {"
             ........
             o......o
             o......o
@@ -672,7 +676,7 @@ mod tests {
             o......o
             ........
             ........
-            " };
+            "};
         assert_block_step(a, 1, b);
         assert_block_step(a, 2, c);
         assert_block_step(a, 3, d);

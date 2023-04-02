@@ -62,7 +62,7 @@ where
 
 #[cfg(test)]
 mod test {
-    use crate::{Block, Node, Population, Quad};
+    use crate::{Block, Node, Population};
 
     #[test]
     fn block() {
@@ -83,21 +83,11 @@ mod test {
         let b2 = Block::from_rows(0x80_40_20_10_08_04_02_01);
         let b3 = Block::from_rows(0xff_ee_dd_cc_bb_aa_99_88);
         let b4 = Block::empty();
-        let mut n = Node::new_leaf(Quad {
-            nw: b1,
-            ne: b2,
-            sw: b3,
-            se: b4,
-        });
+        let mut n = Node::new(b1, b2, b3, b4);
         assert_eq!(56, n.population());
         let pops = [224, 896, 3584, 14336]; // TODO add more
         for p in pops {
-            n = Node::new_inner(Quad {
-                nw: n.clone(),
-                ne: n.clone(),
-                sw: n.clone(),
-                se: n,
-            });
+            n = Node::new(n.clone(), n.clone(), n.clone(), n);
             assert_eq!(p, n.population())
         }
     }
