@@ -23,6 +23,7 @@ impl Quadrant {
                 Self::NE
             }
         } else {
+            #[allow(clippy::collapsible_else_if)]
             if pos.x < 0 {
                 Self::SW
             } else {
@@ -156,16 +157,16 @@ impl<'a, T> IntoIterator for &'a Quad<T> {
         self.iter()
     }
 }
-// impl<T: Copy> Quad<&T> {
-//     pub fn copied(self) -> Quad<T> {
-//         self.map(|v| *v)
-//     }
-// }
-// impl<T: Clone> Quad<&T> {
-//     pub fn cloned(self) -> Quad<T> {
-//         self.map(Clone::clone)
-//     }
-// }
+impl<T: Copy> Quad<&T> {
+    pub fn copied(self) -> Quad<T> {
+        self.map(|v| *v)
+    }
+}
+impl<T: Clone> Quad<&T> {
+    pub fn cloned(self) -> Quad<T> {
+        self.map(Clone::clone)
+    }
+}
 impl<T> Index<Quadrant> for Quad<T> {
     type Output = T;
     fn index(&self, index: Quadrant) -> &Self::Output {

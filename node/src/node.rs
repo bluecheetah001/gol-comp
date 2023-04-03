@@ -19,7 +19,7 @@ pub struct Node(Rc<NodeData>);
 
 impl Node {
     pub(crate) const MAX_WIDTH_LOG2: u8 = 63;
-    /// the offset between depth and width_log2
+    /// the offset between depth and `width_log2`
     pub(crate) const MIN_WIDTH_LOG2: u8 = Block::WIDTH_LOG2 + 1;
     pub(crate) const MAX_DEPTH: u8 = Node::MAX_WIDTH_LOG2 - Node::MIN_WIDTH_LOG2;
 
@@ -147,7 +147,7 @@ impl PartialEq for Node {
 }
 impl Hash for Node {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        std::ptr::hash(self.as_ref(), state)
+        std::ptr::hash(self.as_ref(), state);
     }
 }
 impl std::fmt::Debug for Node {

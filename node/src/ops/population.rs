@@ -2,7 +2,7 @@ use crate::{Block, DepthQuad, Quad};
 
 // TODO this is nice as a trait because it is used a decent amount, but annoying to have to bring it into scope
 pub trait Population {
-    /// if population returns u64::MAX the actual population may be larger
+    /// if population returns `u64::MAX` the actual population may be larger
     fn population(&self) -> u64;
     fn is_empty(&self) -> bool;
 }
@@ -32,12 +32,10 @@ where
     T: Population,
 {
     fn population(&self) -> u64 {
-        self.iter()
-            .map(|v| v.population())
-            .fold(0, u64::saturating_add)
+        self.iter().map(T::population).fold(0, u64::saturating_add)
     }
     fn is_empty(&self) -> bool {
-        self.iter().all(|v| v.is_empty())
+        self.iter().all(T::is_empty)
     }
 }
 
@@ -88,7 +86,7 @@ mod test {
         let pops = [224, 896, 3584, 14336]; // TODO add more
         for p in pops {
             n = Node::new(n.clone(), n.clone(), n.clone(), n);
-            assert_eq!(p, n.population())
+            assert_eq!(p, n.population());
         }
     }
 }

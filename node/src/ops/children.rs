@@ -1,10 +1,9 @@
 //! expands Quad into Quad<Quad>
 
 use crate::{Block, DepthQuad, Node, Quad};
-
-impl Quad<Node> {
-    pub(crate) fn children(&self) -> DepthQuad<Quad<Block>, Quad<Node>> {
-        match self.as_ref().map(|node| node.depth_quad().clone()) {
+impl<'n> Quad<&'n Node> {
+    pub(crate) fn children(&self) -> DepthQuad<&'n Quad<Block>, &'n Quad<Node>> {
+        match self.map(Node::depth_quad) {
             Quad {
                 nw: DepthQuad::Leaf(nw),
                 ne: DepthQuad::Leaf(ne),
@@ -16,7 +15,7 @@ impl Quad<Node> {
                 ne: DepthQuad::Inner(_, ne),
                 sw: DepthQuad::Inner(_, sw),
                 se: DepthQuad::Inner(_, se),
-            } => DepthQuad::Inner(depth, Quad { nw, ne, sw, se }),
+            } => DepthQuad::Inner(*depth, Quad { nw, ne, sw, se }),
             _ => panic!("inconsistent node depth"),
         }
     }

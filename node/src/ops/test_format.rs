@@ -40,7 +40,7 @@ impl Node {
             .map(merge_leafs_row)
             .collect();
         while nodes.len() > 1 {
-            nodes = merge_nodes(nodes)
+            nodes = merge_nodes(nodes);
         }
         nodes.pop().unwrap().pop().unwrap()
     }
@@ -89,10 +89,10 @@ fn parse_block(rows: [&str; 8]) -> Block {
     Block::from_rows_array(rows.map(parse_block_row))
 }
 fn parse_block_row(s: &str) -> u8 {
-    let b = s.as_bytes();
+    debug_assert_eq!(8, s.len());
     let mut p = 0;
-    for i in 0..8 {
-        p |= parse_bit(b[i]) << (7 - i);
+    for (i, byte) in s.as_bytes().iter().enumerate() {
+        p |= parse_bit(*byte) << (7 - i);
     }
     p
 }

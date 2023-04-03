@@ -90,7 +90,7 @@ impl<'n, W: Write> McWriter<'n, W> {
             _ => {
                 self.write_node(node)?;
                 self.last += 1;
-                self.nodes.insert(&node, self.last);
+                self.nodes.insert(node, self.last);
                 Ok(self.last)
             }
         }
@@ -117,6 +117,7 @@ impl<'n, W: Write> McWriter<'n, W> {
     fn write_row(&mut self, row: u8) -> Result<(), IoError> {
         let mut buf = [b'.'; 9];
         let mut dollar = 0;
+        #[allow(clippy::needless_range_loop)]
         for i in 0..8 {
             let bit = (row >> (7 - i)) & 1;
             if bit == 1 {
@@ -125,7 +126,7 @@ impl<'n, W: Write> McWriter<'n, W> {
             }
         }
         buf[dollar] = b'$';
-        self.write.write_all(&buf[..dollar + 1])
+        self.write.write_all(&buf[..=dollar])
     }
 }
 
@@ -206,10 +207,12 @@ impl<S> MacrocellError<S> {
             }
             MacrocellErrorHint::InvalidNumberAfterBlock => "Leaf nodes don't reference other nodes",
             MacrocellErrorHint::InvalidBlockAfterNumber => {
-                "Leaf nodes must be specified on their own line"
+                "Leaf nodes must be specified on their own line, replace with reference"
             }
-            MacrocellErrorHint::InvalidNumberAfterNumber => "Need exactly 4 child nodes",
-            MacrocellErrorHint::InvalidEolAfterNumber => "Need exactly 4 child nodes",
+            MacrocellErrorHint::InvalidNumberAfterNumber => {
+                "Need exactly 4 child nodes, got too many"
+            }
+            MacrocellErrorHint::InvalidEolAfterNumber => "Need exactly 4 child nodes, got too few",
             MacrocellErrorHint::InvalidChar => "Invalid character",
         }
     }
@@ -375,6 +378,7 @@ impl<'src> McReader<'src> {
 
     fn consume_node_line(&mut self) -> MacrocellResult<'src, Node> {
         let pos = self.at;
+        #[allow(clippy::cast_possible_truncation)] // max size checked
         let size = self.consume_number(
             Node::MAX_WIDTH_LOG2 as usize,
             MacrocellErrorHint::SizeTooLarge,
@@ -416,7 +420,7 @@ impl<'src> McReader<'src> {
     fn expect_block_ref(&mut self) -> MacrocellResult<'src, Block> {
         self.expect_ref(Block::empty, |r| match r {
             Either::Left(block) => Some(*block),
-            _ => None,
+            Either::Right(_) => None,
         })
     }
     fn expect_ref<T>(
@@ -573,6 +577,7 @@ mod test {
 
     use crate::{Block, Node};
 
+    #[allow(clippy::needless_pass_by_value)]
     fn assert_node_fmt(node: Node, fmt: &str) {
         let mut fmt = unindent(fmt);
         fmt.insert_str(0, "[M2] (metalife 1.0)\n#R B3/S23\n");

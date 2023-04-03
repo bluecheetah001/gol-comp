@@ -1,6 +1,9 @@
 #![feature(local_key_cell_methods)]
 #![feature(const_option)]
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release
+// lints
+#![warn(clippy::pedantic)]
+#![allow(clippy::module_name_repetitions, clippy::box_default)]
 
 mod image;
 mod reduce;
@@ -11,10 +14,13 @@ use eframe::egui;
 use image::with_image;
 use node::{Node, Population, Pos, Quadrant};
 use tracing_subscriber::fmt::format::FmtSpan;
+use tracing_subscriber::EnvFilter;
 
 fn main() -> Result<(), eframe::Error> {
-    // Log to stdout (if you run with `RUST_LOG=debug`).
     tracing_subscriber::fmt()
+        .with_target(true)
+        // .with_timer(LocalTime)
+        .with_env_filter(EnvFilter::from_default_env())
         .with_span_events(FmtSpan::CLOSE)
         .init();
 
@@ -142,12 +148,12 @@ fn paint_node(
                 points_per_cell,
                 pos + Pos::in_dir(q, quarter_width),
                 &inner[q],
-            )
+            );
         }
     } else {
         with_image(painter.ctx(), node, |image| {
             let uv = egui::Rect::from_min_max(egui::pos2(0.0, 0.0), egui::pos2(1.0, 1.0));
-            painter.image(image, rect, uv, painter.ctx().style().visuals.text_color())
-        })
+            painter.image(image, rect, uv, painter.ctx().style().visuals.text_color());
+        });
     }
 }

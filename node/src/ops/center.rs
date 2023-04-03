@@ -11,15 +11,15 @@ impl Node {
         }
     }
     pub(crate) fn center_at_depth(&self, depth: u8) -> Node {
-        fn get_smaller(inner: Quad<Node>, depth: u8) -> Node {
+        fn get_smaller(inner: Quad<&Node>, depth: u8) -> Node {
             match inner.children() {
                 DepthQuad::Leaf(leaf) => {
                     assert_eq!(depth, 0);
-                    leaf.center().into()
+                    leaf.center().copied().into()
                 }
                 DepthQuad::Inner(at_depth, inner) => {
                     if at_depth.get() == depth {
-                        inner.center().into()
+                        inner.center().cloned().into()
                     } else {
                         get_smaller(inner.center(), depth)
                     }
@@ -41,18 +41,21 @@ impl Node {
                 DepthQuad::Inner(_, inner) => get_larger(inner.clone(), depth),
             },
             std::cmp::Ordering::Equal => self.clone(),
-            std::cmp::Ordering::Greater => get_smaller(self.inner().unwrap().clone(), depth),
+            std::cmp::Ordering::Greater => get_smaller(self.inner().unwrap().as_ref(), depth),
         }
     }
 }
 
-impl Quad<Node> {
+impl Quad<&Node> {
+    // a bit inconsistent with other methods, but all the places that use this want to own the result
     pub(crate) fn center(&self) -> DepthQuad<Block, Node> {
         match self.children() {
-            DepthQuad::Leaf(leaf) => DepthQuad::Leaf(leaf.center()),
-            DepthQuad::Inner(depth, inner) => DepthQuad::Inner(depth, inner.center()),
+            DepthQuad::Leaf(leaf) => DepthQuad::Leaf(leaf.center().copied()),
+            DepthQuad::Inner(depth, inner) => DepthQuad::Inner(depth, inner.center().cloned()),
         }
     }
+}
+impl Quad<Node> {
     pub(crate) fn expand(self) -> Quad<Node> {
         let empty = Node::empty(self.nw.depth());
         Quad {
@@ -87,7 +90,7 @@ impl Quad<Block> {
 }
 impl Block {
     // is only used for tests
-    pub(crate) fn expand(&self) -> Quad<Block> {
+    pub(crate) fn expand(self) -> Quad<Block> {
         let bits = self.to_rows();
         let nw = Block::from_rows((bits & 0xf0_f0_f0_f0_00_00_00_00) >> (4 * 8 + 4));
         let ne = Block::from_rows((bits & 0x0f_0f_0f_0f_00_00_00_00) >> (4 * 8 - 4));
@@ -97,18 +100,13 @@ impl Block {
     }
 }
 
-impl<T> Quad<Quad<T>>
-where
-    T: Clone,
-{
-    // TODO a couple of places may be more efficient if this returned Quad<&T>
-    // but that will take a decent amount of work for not much gain
-    pub(crate) fn center(&self) -> Quad<T> {
+impl<'t, T> Quad<&'t Quad<T>> {
+    pub(crate) fn center(&self) -> Quad<&'t T> {
         Quad {
-            nw: self.nw.se.clone(),
-            ne: self.ne.sw.clone(),
-            sw: self.sw.ne.clone(),
-            se: self.se.nw.clone(),
+            nw: &self.nw.se,
+            ne: &self.ne.sw,
+            sw: &self.sw.ne,
+            se: &self.se.nw,
         }
     }
 }

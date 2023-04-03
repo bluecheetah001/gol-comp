@@ -1,7 +1,7 @@
 use lru::LruCache;
 use std::cell::RefCell;
 use std::num::{NonZeroU64, NonZeroUsize};
-use tracing::{debug, debug_span, trace_span};
+use tracing::{trace, trace_span};
 
 use crate::{Block, DepthQuad, Node, Population, Quad};
 
@@ -9,9 +9,25 @@ const LRU_CACHE_SIZE: NonZeroUsize = NonZeroUsize::new(1 << 24).unwrap();
 
 // TODO may want to store Either<Node,Block> results so the smallest cache is 16x16 instead of 32x32
 //      xor directly implement Quad<Quad<Block>>::step_center()
-type StepCache = LruCache<(Node, NonZeroU64), Node>;
+struct StepCache {
+    lru: LruCache<(Node, NonZeroU64), Node>,
+    // it's a bit weird to store this 'globally' and periodicaly reset them
+    // but it means it won't be hard to modify reporting to dump this once a second or every 100 calls ect
+    // and with a bit of cleanup could track more interesting stats (like breaking this down per depth )
+    hit: u32,
+    miss: u32,
+}
+impl StepCache {
+    fn new() -> Self {
+        Self {
+            lru: LruCache::new(LRU_CACHE_SIZE),
+            hit: 0,
+            miss: 0,
+        }
+    }
+}
 thread_local! {
-    static STEP_CACHE: RefCell<StepCache> = RefCell::new(StepCache::new(LRU_CACHE_SIZE));
+    static STEP_CACHE: RefCell<StepCache> = RefCell::new(StepCache::new());
 }
 
 /// depth of 0 is a 16x16 area and can conceptually step 4 times
@@ -28,6 +44,7 @@ fn steps_to_min_depth(steps: NonZeroU64) -> u8 {
     if steps.get() <= Block::WIDTH {
         1
     } else {
+        #[allow(clippy::cast_possible_truncation)] // max from ilog2 is 32
         let floor = steps.ilog2() as u8 - (Block::WIDTH_LOG2 - 1);
         if steps.is_power_of_two() {
             floor
@@ -49,14 +66,25 @@ impl Node {
                 // so we unbuffer given node so it is >= min_depth - 1
                 let min_depth = steps_to_min_depth(steps);
                 let depth = self.unbufferd_depth(min_depth - 1) + 2;
+
+                let _span = trace_span!("step", depth, steps).entered();
+
                 let root = self.center_at_depth(depth);
-                STEP_CACHE.with_borrow_mut(|step_cache| root.step_center(steps, step_cache))
+                STEP_CACHE.with_borrow_mut(|step_cache| {
+                    let result = root.step_center(steps, step_cache);
+
+                    trace!(step_cache.hit, step_cache.miss, "cache_perf");
+                    step_cache.hit = 0;
+                    step_cache.miss = 0;
+
+                    result
+                })
             }
         }
     }
     // find the smallest depth where the node is unbuffered, maxed with target_depth
     fn unbufferd_depth(&self, target_depth: u8) -> u8 {
-        fn unbufferd_depth_inner(inner: Quad<Node>, target_depth: u8) -> u8 {
+        fn unbufferd_depth_inner(inner: Quad<&Node>, target_depth: u8) -> u8 {
             let child_depth = inner.nw.depth();
             if child_depth < target_depth {
                 target_depth
@@ -75,11 +103,11 @@ impl Node {
         if node_depth <= target_depth {
             target_depth
         } else {
-            unbufferd_depth_inner(self.inner().unwrap().clone(), target_depth)
+            unbufferd_depth_inner(self.inner().unwrap().as_ref(), target_depth)
         }
     }
 }
-impl<T> Quad<Quad<T>>
+impl<T> Quad<&Quad<T>>
 where
     T: Population,
 {
@@ -99,7 +127,7 @@ where
             &self.se.se,
         ]
         .into_iter()
-        .all(|x| x.is_empty())
+        .all(T::is_empty)
     }
 }
 
@@ -107,31 +135,34 @@ where
 
 impl Node {
     fn step_center(&self, steps: NonZeroU64, step_cache: &mut StepCache) -> Node {
-        step_cache
-            .get(&(self.clone(), steps))
-            .cloned()
-            .unwrap_or_else(|| {
+        match step_cache.lru.get(&(self.clone(), steps)) {
+            None => {
+                step_cache.miss += 1;
                 let result = self.step_center_impl(steps, step_cache);
-                step_cache.put((self.clone(), steps), result.clone());
+                step_cache.lru.put((self.clone(), steps), result.clone());
                 result
-            })
+            }
+            Some(result) => {
+                step_cache.hit += 1;
+                result.clone()
+            }
+        }
     }
     fn step_center_impl(&self, steps: NonZeroU64, step_cache: &mut StepCache) -> Node {
-        debug!(depth = self.depth(), steps = steps);
-        // let _span = debug_span!("step_center", depth = self.depth(), steps = steps).entered();
-
         let max_steps = depth_to_max_steps(self.depth());
         debug_assert!(steps.get() <= max_steps);
         let first_half_steps = steps.get().saturating_sub(max_steps / 2);
         let second_half_steps = steps.get() - first_half_steps;
-        match self.inner().unwrap().children() {
+        match self.inner().unwrap().as_ref().children() {
             DepthQuad::Leaf(leaf) => leaf
+                .copied()
                 .overlaps_hood()
                 .map(|quad| quad.step_center(first_half_steps))
                 .overlaps_quad()
                 .map(|quad| quad.step_center(second_half_steps))
                 .into(),
             DepthQuad::Inner(_, inner) => inner
+                .cloned()
                 .overlaps_hood()
                 .map(|quad| quad.step_center(first_half_steps, step_cache))
                 .overlaps_quad()
@@ -141,10 +172,10 @@ impl Node {
     }
 }
 impl Quad<Node> {
-    fn step_center(&self, steps: u64, step_cache: &mut StepCache) -> Node {
+    fn step_center(self, steps: u64, step_cache: &mut StepCache) -> Node {
         match NonZeroU64::new(steps) {
-            None => self.center().into(),
-            Some(steps) => Node::from(self.clone()).step_center(steps, step_cache),
+            None => self.as_ref().center().into(),
+            Some(steps) => Node::from(self).step_center(steps, step_cache),
         }
     }
 }
@@ -181,6 +212,7 @@ impl<T> Quad<Quad<T>>
 where
     T: Clone,
 {
+    #[allow(clippy::many_single_char_names)]
     fn overlaps_hood(self) -> Hood<Quad<T>> {
         let n = Quad {
             nw: self.nw.ne.clone(),
@@ -194,7 +226,7 @@ where
             sw: self.sw.nw.clone(),
             se: self.sw.ne.clone(),
         };
-        let c = self.center();
+        let c = self.as_ref().center().cloned();
         let e = Quad {
             nw: self.ne.sw.clone(),
             ne: self.ne.se.clone(),
@@ -275,10 +307,11 @@ impl Quad<Block> {
         Block::from_rows(unshape_center(rows[1], rows[2]))
     }
 }
+#[allow(clippy::similar_names)]
 fn shape_north(w: u64, e: u64) -> u64 {
-    let r0w = (w >> 00) & 0xff_00_00_00_00_00_00_00;
-    let r0e = (e >> 08) & 0x00_ff_00_00_00_00_00_00;
-    let r1w = (w >> 08) & 0x00_00_ff_00_00_00_00_00;
+    let r0w = w & 0xff_00_00_00_00_00_00_00;
+    let r0e = (e >> 8) & 0x00_ff_00_00_00_00_00_00;
+    let r1w = (w >> 8) & 0x00_00_ff_00_00_00_00_00;
     let r1e = (e >> 16) & 0x00_00_00_ff_00_00_00_00;
     let r2w = (w >> 16) & 0x00_00_00_00_ff_00_00_00;
     let r2e = (e >> 24) & 0x00_00_00_00_00_ff_00_00;
@@ -286,26 +319,27 @@ fn shape_north(w: u64, e: u64) -> u64 {
     let r3e = (e >> 32) & 0x00_00_00_00_00_00_00_ff;
     r0w | r0e | r1w | r1e | r2w | r2e | r3w | r3e
 }
+#[allow(clippy::similar_names)]
 fn shape_south(w: u64, e: u64) -> u64 {
     let r0w = (w << 32) & 0xff_00_00_00_00_00_00_00;
     let r0e = (e << 24) & 0x00_ff_00_00_00_00_00_00;
     let r1w = (w << 24) & 0x00_00_ff_00_00_00_00_00;
     let r1e = (e << 16) & 0x00_00_00_ff_00_00_00_00;
     let r2w = (w << 16) & 0x00_00_00_00_ff_00_00_00;
-    let r2e = (e << 08) & 0x00_00_00_00_00_ff_00_00;
-    let r3w = (w << 08) & 0x00_00_00_00_00_00_ff_00;
-    let r3e = (e << 00) & 0x00_00_00_00_00_00_00_ff;
+    let r2e = (e << 8) & 0x00_00_00_00_00_ff_00_00;
+    let r3w = (w << 8) & 0x00_00_00_00_00_00_ff_00;
+    let r3e = e & 0x00_00_00_00_00_00_00_ff;
     r0w | r0e | r1w | r1e | r2w | r2e | r3w | r3e
 }
 fn unshape_center(n: u64, s: u64) -> u64 {
-    let r0 = (n << 04) & 0xff_00_00_00_00_00_00_00;
+    let r0 = (n << 4) & 0xff_00_00_00_00_00_00_00;
     let r1 = (n << 12) & 0x00_ff_00_00_00_00_00_00;
     let r2 = (n << 20) & 0x00_00_ff_00_00_00_00_00;
     let r3 = (n << 28) & 0x00_00_00_ff_00_00_00_00;
     let r4 = (s >> 28) & 0x00_00_00_00_ff_00_00_00;
     let r5 = (s >> 20) & 0x00_00_00_00_00_ff_00_00;
     let r6 = (s >> 12) & 0x00_00_00_00_00_00_ff_00;
-    let r7 = (s >> 04) & 0x00_00_00_00_00_00_00_ff;
+    let r7 = (s >> 4) & 0x00_00_00_00_00_00_00_ff;
     r0 | r1 | r2 | r3 | r4 | r5 | r6 | r7
 }
 
@@ -320,7 +354,7 @@ fn step_rows_once(rows: &mut [u64; 4]) {
         step_row_shift(rows[0], rows[1], rows[2]),
         step_row_shift(rows[1], rows[2], rows[3]),
         step_row_shift(rows[2], rows[3], 0),
-    ]
+    ];
 }
 fn step_row(above: u64, row: u64, below: u64) -> u64 {
     // compute a bitwise addition of 3 values (as 2 separate results)
@@ -361,6 +395,7 @@ fn step_row(above: u64, row: u64, below: u64) -> u64 {
 // tests
 
 #[cfg(test)]
+#[allow(clippy::many_single_char_names)]
 mod tests {
     use crate::{test_block, Block, Node};
 

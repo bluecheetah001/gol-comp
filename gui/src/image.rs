@@ -18,11 +18,12 @@ pub fn with_image(ctx: &Context, node: &Node, f: impl FnOnce(TextureId)) {
     // but in practice this will only be called for nodes with very small depth (probably never more than 64x64 pixels)
     IMAGE_CACHE.with_borrow_mut(|image_cache| {
         let image = image_cache.get_or_insert(node.clone(), || load_image(ctx, node));
-        f(image.id())
+        f(image.id());
     });
 }
 
 fn load_image(ctx: &Context, node: &Node) -> TextureHandle {
+    #[allow(clippy::cast_possible_truncation)] // TODO check against sqrt(usize::MAX)
     let image_width = node.width() as usize;
     let mut pixels = vec![Color32::TRANSPARENT; image_width * image_width];
     fill_image(image_width, &mut pixels, 0, node);
@@ -44,7 +45,8 @@ fn fill_image(image_width: usize, pixels: &mut Vec<Color32>, index: usize, node:
             fill_image_block(image_width, pixels, index + 8 * image_width + 8, leaf.se);
         }
         node::DepthQuad::Inner(_, inner) => {
-            let half_width = node.half_width() as usize;
+            #[allow(clippy::cast_possible_truncation)] // checked in load_image
+            let half_width = node.width() as usize / 2; // explicit / 2 to stay unsigned
             fill_image(image_width, pixels, index, &inner.nw);
             fill_image(image_width, pixels, index + half_width, &inner.ne);
             fill_image(
@@ -62,7 +64,7 @@ fn fill_image(image_width: usize, pixels: &mut Vec<Color32>, index: usize, node:
         }
     }
 }
-fn fill_image_block(image_width: usize, pixels: &mut Vec<Color32>, index: usize, block: Block) {
+fn fill_image_block(image_width: usize, pixels: &mut [Color32], index: usize, block: Block) {
     let bits: u64 = block.to_rows();
     for i in BitIter::from(bits) {
         let i = 63 - i;

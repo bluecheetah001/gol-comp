@@ -4,7 +4,7 @@ use std::fmt::Debug;
 /// An 8x8 block of cells
 ///
 /// # implementation details
-/// stored in row-major format (see [Block::from_rows()])
+/// stored in row-major format (see `Block::from_rows`)
 pub struct Block {
     bits: u64,
 }

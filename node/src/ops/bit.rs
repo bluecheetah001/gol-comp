@@ -19,13 +19,12 @@ impl Node {
         } else {
             match (self.depth_quad(), rhs.depth_quad()) {
                 (crate::DepthQuad::Leaf(lhs), crate::DepthQuad::Leaf(rhs)) => {
-                    lhs.zip_map(*rhs, |lhs, rhs| lhs | rhs).into()
+                    lhs.zip_map(*rhs, Block::bitor).into()
                 }
                 (crate::DepthQuad::Inner(depth, lhs), crate::DepthQuad::Inner(_, rhs)) => {
                     Node::new_depth_inner(
                         *depth,
-                        lhs.as_ref()
-                            .zip_map(rhs.as_ref(), |lhs, rhs| lhs.bitor_impl(rhs)),
+                        lhs.as_ref().zip_map(rhs.as_ref(), Node::bitor_impl),
                     )
                 }
                 _ => panic!("inconsistent depth"),
