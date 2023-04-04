@@ -1,5 +1,7 @@
 run:
-    RUST_LOG='trace,eframe=debug' cargo run
+    RUST_LOG='debug' cargo run
+run-trace:
+    RUST_LOG='debug,node=trace,gui=trace' cargo run
 
 check:
     cargo clippy

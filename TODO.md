@@ -1,0 +1,23 @@
+- (X) population
+  - (D) bigint
+- (X) step
+  - (C) test
+- (X) get/set
+  - (C) test
+- (X) macrocell
+  - (C) test
+- (X) image
+  - (C) test
+  - (C) expand to include 
+- (X) drag screen
+- (A) click screen to set/clear cell
+- (B) hide Block, instead expose 2d bitvec
+  - doc and test
+  - copy from rect, paste to pos
+  - depth aware full bitvec
+- (C) normalize node
+  - document how fns treat depth
+  - should almost never need to be called, serves as a place to document assumptions
+- (D) runtime config to tune caches
+- (D) hide depth, instead just use width_log2 renamed as size
+  - is easier to think about externally and helps prepare api for non-two-state cells

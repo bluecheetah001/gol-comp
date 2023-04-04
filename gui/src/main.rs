@@ -3,7 +3,11 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release
 // lints
 #![warn(clippy::pedantic)]
-#![allow(clippy::module_name_repetitions, clippy::box_default)]
+#![allow(
+    clippy::module_name_repetitions,
+    clippy::box_default,
+    clippy::similar_names
+)]
 
 mod image;
 mod reduce;
@@ -44,7 +48,6 @@ impl Default for MyApp {
         Self {
             board: Board::new_centered(
                 Node::read_from_bytes(&fs::read("test.mc").unwrap()).unwrap(),
-                egui::vec2(1000.0, 1000.0),
             ),
         }
     }
@@ -65,22 +68,21 @@ struct Board {
     center: Pos,
     center_fine: egui::Vec2,
     points_per_cell: f32,
-    size: egui::Vec2,
 }
 impl Board {
-    pub fn new_centered(node: Node, size: egui::Vec2) -> Self {
+    pub fn new_centered(node: Node) -> Self {
         Self {
             node,
             center: Pos { x: 0, y: 0 },
             center_fine: egui::vec2(0.0, 0.0),
             points_per_cell: 4.0,
-            size,
         }
     }
 }
 impl egui::Widget for &mut Board {
     fn ui(self, ui: &mut egui::Ui) -> egui::Response {
-        let (response, painter) = ui.allocate_painter(self.size, egui::Sense::click_and_drag());
+        let (response, painter) =
+            ui.allocate_painter(ui.available_size(), egui::Sense::click_and_drag());
 
         let pixels_per_point = painter.ctx().pixels_per_point();
         let points_per_cell = (self.points_per_cell * pixels_per_point)
@@ -88,14 +90,21 @@ impl egui::Widget for &mut Board {
             .max(1.0) // zooming out isn't supported yet
             / pixels_per_point;
 
+        #[allow(clippy::cast_possible_truncation)] // floats should be small
+        if response.dragged_by(egui::PointerButton::Secondary) {
+            self.center_fine -= response.drag_delta() / points_per_cell;
+
+            let center_x_floor = self.center_fine.x.floor();
+            self.center_fine.x -= center_x_floor;
+            self.center.x += center_x_floor as i64;
+
+            let center_y_floor = self.center_fine.y.floor();
+            self.center_fine.y -= center_y_floor;
+            self.center.y += center_y_floor as i64;
+        }
+
         let center_point = painter
             .round_pos_to_pixels(painter.clip_rect().center() - self.center_fine * points_per_cell);
-
-        // if let Some(pos) = response.interact_pointer_pos(){
-        //     pos
-        // }
-        // if response.clicked_by(PointerButton::Primary){
-        // }
 
         // TODO adjust self.points_per_cell and self.center_fine based on above rounding?
 
@@ -112,6 +121,7 @@ impl egui::Widget for &mut Board {
         response
     }
 }
+#[allow(clippy::cast_precision_loss)] // positions should be small
 fn paint_node(
     painter: &egui::Painter,
     center_point: egui::Pos2,
