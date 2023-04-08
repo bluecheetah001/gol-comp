@@ -1,3 +1,4 @@
+# Node
 - (X) population
   - (D) bigint
 - (X) step
@@ -6,11 +7,8 @@
   - (C) test
 - (X) macrocell
   - (C) test
-- (X) image
+- (A) reduce
   - (C) test
-  - (C) expand to include 
-- (X) drag screen
-- (A) click screen to set/clear cell
 - (B) hide Block, instead expose 2d bitvec
   - doc and test
   - copy from rect, paste to pos
@@ -21,3 +19,17 @@
 - (D) runtime config to tune caches
 - (D) hide depth, instead just use width_log2 renamed as size
   - is easier to think about externally and helps prepare api for non-two-state cells
+# GUI
+- (X) image
+- (X) drag screen
+- (X) zoom screen in and out
+- (A) grid lines
+- (A) play/pause and speed control
+  - display generation number, population, and speed
+  - space to advance once (the base speed, which may not be 1 generation)
+  - entry to play/pause
+  - numpad + to increase speed (default doubles)
+  - numpad - to decrease speed
+    - expressed as b*2^n
+- (A) click screen to set/clear cell
+  - display cursor position

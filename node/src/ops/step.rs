@@ -134,12 +134,13 @@ where
 // recurse logic
 
 impl Node {
-    fn step_center(&self, steps: NonZeroU64, step_cache: &mut StepCache) -> Node {
-        match step_cache.lru.get(&(self.clone(), steps)) {
+    fn step_center(self, steps: NonZeroU64, step_cache: &mut StepCache) -> Node {
+        let key = (self, steps);
+        match step_cache.lru.get(&key) {
             None => {
                 step_cache.miss += 1;
-                let result = self.step_center_impl(steps, step_cache);
-                step_cache.lru.put((self.clone(), steps), result.clone());
+                let result = key.0.step_center_impl(steps, step_cache);
+                step_cache.lru.put(key, result.clone());
                 result
             }
             Some(result) => {

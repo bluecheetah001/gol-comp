@@ -67,15 +67,23 @@ struct Board {
     node: Node,
     center: Pos,
     center_fine: egui::Vec2,
-    points_per_cell: f32,
+    /// pixels_per_cell is 2^zoom
+    zoom: i8,
+    // /// linear scale on top of pixels_per_cell to avoid zooming too quickly
+    // /// is between .707 and 1.414
+    // zoom_fine: f32,
 }
 impl Board {
+    const MIN_ZOOM: i8 = -70;
+    const MAX_ZOOM: i8 = 5;
     pub fn new_centered(node: Node) -> Self {
         Self {
             node,
+            // TODO infer default center based on node bounding box
             center: Pos { x: 0, y: 0 },
             center_fine: egui::vec2(0.0, 0.0),
-            points_per_cell: 4.0,
+            // TODO infer default zoom based on ui rect and node bounding box
+            zoom: 2,
         }
     }
 }
@@ -84,15 +92,27 @@ impl egui::Widget for &mut Board {
         let (response, painter) =
             ui.allocate_painter(ui.available_size(), egui::Sense::click_and_drag());
 
+        // if response.has_focus() { // TODO not sure how to manage focus
+        ui.input(|input| {
+            if input.key_pressed(egui::Key::I) && self.zoom < Board::MAX_ZOOM {
+                self.zoom += 1;
+            }
+            if input.key_pressed(egui::Key::O) && self.zoom > Board::MIN_ZOOM {
+                self.zoom -= 1;
+            }
+            // TODO `input.zoom_delta()` for touch screens
+            // TODO `input.scroll_delta` for touch screens since i can't check for scroll wheel specifically to turn into zoom
+        });
+        // }
+
+        let pixels_per_cell = 2.0_f32.powi(self.zoom.into());
         let pixels_per_point = painter.ctx().pixels_per_point();
-        let points_per_cell = (self.points_per_cell * pixels_per_point)
-            .round()
-            .max(1.0) // zooming out isn't supported yet
-            / pixels_per_point;
+        let points_per_cell = pixels_per_cell / pixels_per_point;
 
         #[allow(clippy::cast_possible_truncation)] // floats should be small
+        // TODO also use ui.input.scroll_delta
         if response.dragged_by(egui::PointerButton::Secondary) {
-            self.center_fine -= response.drag_delta() / points_per_cell;
+            self.center_fine -= response.drag_delta() * pixels_per_point / pixels_per_cell;
 
             let center_x_floor = self.center_fine.x.floor();
             self.center_fine.x -= center_x_floor;
@@ -106,15 +126,25 @@ impl egui::Widget for &mut Board {
         let center_point = painter
             .round_pos_to_pixels(painter.clip_rect().center() - self.center_fine * points_per_cell);
 
-        // TODO adjust self.points_per_cell and self.center_fine based on above rounding?
+        if self.zoom >= 0 {
+            paint_node(
+                &painter,
+                center_point,
+                points_per_cell,
+                -self.center,
+                &self.node,
+            );
+        } else {
+            let node = self.node.reduce_by(self.zoom.unsigned_abs());
 
-        paint_node(
-            &painter,
-            center_point,
-            points_per_cell,
-            -self.center,
-            &self.node,
-        );
+            paint_node(
+                &painter,
+                center_point,
+                1.0 / pixels_per_point,
+                -self.center,
+                &node,
+            );
+        }
 
         // TODO or handle response internally since this maybe shouldn't be a widget
         // as this needs to do 'complicated' coordinate transforms

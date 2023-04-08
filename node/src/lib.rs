@@ -27,6 +27,7 @@ mod ops {
     mod get;
     mod mc_format;
     mod population;
+    mod reduce;
     mod step;
     mod test_format;
 

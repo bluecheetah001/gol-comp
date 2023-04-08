@@ -59,36 +59,3 @@ impl Debug for Block {
         )
     }
 }
-// impl Quad<Block> {
-//     /// convert a quad of blocks into a single block by unioning 2x2 cells into a single cell
-//     pub fn zoom_out(&self) -> Block {
-//         fn zoom_out_h(w: Block, e: Block) -> Block {
-//             let w = w.0 | (w.0 << 1);
-//             let e = e.0 | (e.0 << 1);
-//             let c0 = (w << 0) & 0x80_80_80_80_80_80_80_80;
-//             let c1 = (w << 1) & 0x40_40_40_40_40_40_40_40;
-//             let c2 = (w << 2) & 0x20_20_20_20_20_20_20_20;
-//             let c3 = (w << 3) & 0x10_10_10_10_10_10_10_10;
-//             let c4 = (e >> 4) & 0x08_08_08_08_08_08_08_08;
-//             let c5 = (e >> 3) & 0x04_04_04_04_04_04_04_04;
-//             let c6 = (e >> 2) & 0x02_02_02_02_02_02_02_02;
-//             let c7 = (e >> 1) & 0x01_01_01_01_01_01_01_01;
-//             Block(c0 | c1 | c2 | c3 | c4 | c5 | c6 | c7)
-//         }
-//         fn zoom_out_v(n: Block, s: Block) -> Block {
-//             let n = n.0 | (n.0 << 8);
-//             let s = s.0 | (s.0 << 8);
-//             let r0 = (n << 00) & 0xff_00_00_00_00_00_00_00;
-//             let r1 = (n << 08) & 0x00_ff_00_00_00_00_00_00;
-//             let r2 = (n << 16) & 0x00_00_ff_00_00_00_00_00;
-//             let r3 = (n << 24) & 0x00_00_00_ff_00_00_00_00;
-//             let r4 = (s >> 32) & 0x00_00_00_00_ff_00_00_00;
-//             let r5 = (s >> 24) & 0x00_00_00_00_00_ff_00_00;
-//             let r6 = (s >> 16) & 0x00_00_00_00_00_00_ff_00;
-//             let r7 = (s >> 08) & 0x00_00_00_00_00_00_00_ff;
-//             Block(r0 | r1 | r2 | r3 | r4 | r5 | r6 | r7)
-//         }
-//         let Self { nw, ne, sw, se } = *self;
-//         zoom_out_v(zoom_out_h(nw, ne), zoom_out_h(sw, se))
-//     }
-// }
