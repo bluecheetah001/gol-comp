@@ -17,8 +17,11 @@
   - document how fns treat depth
   - should almost never need to be called, serves as a place to document assumptions
 - (D) runtime config to tune caches
+  - build a cache module to generalize how/what metrics are collected (hits, misses, generations)
+  - evaluate alternative cache crates, possibly just getting API design right
 - (D) hide depth, instead just use width_log2 renamed as size
   - is easier to think about externally and helps prepare api for non-two-state cells
+- (D) evaluate need to use a bigint library, are any optimized for relatively small ints? I doubt I'd get much past 100 bits, but would rather not pay for u128 everywhere
 # GUI
 - (X) image
 - (X) drag screen

@@ -60,27 +60,28 @@ impl Node {
     pub fn step(&self, steps: u64) -> Node {
         match NonZeroU64::new(steps) {
             None => self.clone(),
-            Some(steps) => {
-                // step will reduce the area of the node, but also the unbuffered node will grow up to the same amount
-                // so we need 2 buffer nodes that are both >= min_depth
-                // so we unbuffer given node so it is >= min_depth - 1
-                let min_depth = steps_to_min_depth(steps);
-                let depth = self.unbufferd_depth(min_depth - 1) + 2;
-
-                let _span = trace_span!("step", depth, steps).entered();
-
-                let root = self.center_at_depth(depth);
-                STEP_CACHE.with_borrow_mut(|step_cache| {
-                    let result = root.step_center(steps, step_cache);
-
-                    trace!(step_cache.hit, step_cache.miss, "cache_perf");
-                    step_cache.hit = 0;
-                    step_cache.miss = 0;
-
-                    result
-                })
-            }
+            Some(steps) => self.step_non_zero(steps),
         }
+    }
+    pub fn step_non_zero(&self, steps: NonZeroU64) -> Node {
+        // step will reduce the area of the node, but also the unbuffered node will grow up to the same amount
+        // so we need 2 buffer nodes that are both >= min_depth
+        // so we unbuffer given node so it is >= min_depth - 1
+        let min_depth = steps_to_min_depth(steps);
+        let depth = self.unbufferd_depth(min_depth - 1) + 2;
+
+        let _span = trace_span!("step", depth, steps).entered();
+
+        let root = self.center_at_depth(depth);
+        STEP_CACHE.with_borrow_mut(|step_cache| {
+            let result = root.step_center(steps, step_cache);
+
+            trace!(step_cache.hit, step_cache.miss, "cache_perf");
+            step_cache.hit = 0;
+            step_cache.miss = 0;
+
+            result
+        })
     }
     // find the smallest depth where the node is unbuffered, maxed with target_depth
     fn unbufferd_depth(&self, target_depth: u8) -> u8 {
