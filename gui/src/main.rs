@@ -176,6 +176,22 @@ impl egui::Widget for &mut Board {
             .round_pos_to_pixels(painter.clip_rect().center() - self.center_fine * points_per_cell);
 
         // TODO handle draw inputs
+        #[allow(clippy::cast_possible_truncation)] // did floor, floats should be small
+        let hover = response.hover_pos().map(|mouse| {
+            let mouse_cell = ((mouse - center_point) / points_per_cell).floor();
+            self.center
+                + Pos {
+                    x: mouse_cell.x as i64,
+                    y: mouse_cell.y as i64,
+                }
+        });
+        if let Some(hover) = hover {
+            if self.zoom_power >= 0 && response.clicked_by(egui::PointerButton::Primary) {
+                // TODO flip operation?
+                // TODO .set and .step ect could also work with &mut
+                self.node = self.node.set(hover, !self.node.get(hover));
+            }
+        }
 
         // handle update
         let now = Instant::now();
@@ -248,6 +264,10 @@ impl egui::Widget for &mut Board {
             } else {
                 let delay_sec = self.slow_play_delay().as_secs_f32();
                 ui.label(format!("speed: {step_size}/{delay_sec}s"));
+            }
+
+            if let Some(Pos { x, y }) = hover {
+                ui.label(format!("mouse: {x},{y}"));
             }
         });
 

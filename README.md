@@ -7,3 +7,5 @@
 - can play/pause with Enter
   - can increase speed with + and decrease with -
   - can be less than one step per frame, in which case it delays based on real time
+- can flip a single cell with left mouse click
+  - cannot do so when zoomed out
