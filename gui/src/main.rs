@@ -16,6 +16,7 @@ use std::num::NonZeroU64;
 use std::time::{Duration, Instant};
 
 use eframe::egui;
+use eframe::epaint::Color32;
 use image::with_image;
 use node::{Node, Population, Pos, Quadrant};
 use tracing_subscriber::fmt::format::FmtSpan;
@@ -49,6 +50,7 @@ impl Default for MyApp {
         Self {
             board: Board::new_centered(
                 Node::read_from_bytes(&fs::read("test.mc").unwrap()).unwrap(),
+                Node::read_from_bytes(&fs::read("glider.mc").unwrap()).unwrap(),
             ),
         }
     }
@@ -80,6 +82,7 @@ struct Board {
     // /// linear scale on top of pixels_per_cell to avoid zooming too quickly
     // /// is between .707 and 1.414
     // zoom_fine: f32,
+    placing: Node,
 }
 impl Board {
     const MIN_ZOOM: i8 = -70;
@@ -89,7 +92,7 @@ impl Board {
     const MAX_PLAY: i8 = 16;
     const FOOTER_HEIGHT: f32 = 10.0;
 
-    pub fn new_centered(node: Node) -> Self {
+    pub fn new_centered(node: Node, placing: Node) -> Self {
         Self {
             node,
 
@@ -104,6 +107,8 @@ impl Board {
             center_fine: egui::vec2(0.0, 0.0),
             // TODO infer default zoom based on ui rect and node bounding box
             zoom_power: 2,
+
+            placing,
         }
     }
 
@@ -187,9 +192,13 @@ impl egui::Widget for &mut Board {
         });
         if let Some(hover) = hover {
             if self.zoom_power >= 0 && response.clicked_by(egui::PointerButton::Primary) {
+                // if cursor == Toggle
                 // TODO flip operation?
                 // TODO .set and .step ect could also work with &mut
-                self.node = self.node.set(hover, !self.node.get(hover));
+                // self.node = self.node.set(hover, !self.node.get(hover));
+
+                // if cursor == Paste, mode == Or
+                self.node = self.node.or(&self.placing.offset(hover));
             }
         }
 
@@ -230,7 +239,19 @@ impl egui::Widget for &mut Board {
                 points_per_cell,
                 -self.center,
                 &self.node,
+                Color32::WHITE,
             );
+            // if cursor == Paste
+            if let Some(hover) = hover {
+                paint_node(
+                    &painter,
+                    center_point,
+                    points_per_cell,
+                    -self.center + hover,
+                    &self.placing,
+                    Color32::from_rgba_premultiplied(0, 0, 255, 128),
+                );
+            }
         } else {
             let node = self.node.reduce_by(self.zoom_power.unsigned_abs());
 
@@ -240,6 +261,7 @@ impl egui::Widget for &mut Board {
                 1.0 / pixels_per_point,
                 -self.center,
                 &node,
+                Color32::WHITE,
             );
         }
 
@@ -282,6 +304,7 @@ fn paint_node(
     points_per_cell: f32,
     pos: Pos,
     node: &Node,
+    color: Color32,
 ) {
     if node.is_empty() {
         return;
@@ -312,12 +335,13 @@ fn paint_node(
                 points_per_cell,
                 pos + Pos::in_dir(q, quarter_width),
                 &inner[q],
+                color,
             );
         }
     } else {
         with_image(painter.ctx(), node, |image| {
             let uv = egui::Rect::from_min_max(egui::pos2(0.0, 0.0), egui::pos2(1.0, 1.0));
-            painter.image(image, rect, uv, painter.ctx().style().visuals.text_color());
+            painter.image(image, rect, uv, color);
         });
     }
 }

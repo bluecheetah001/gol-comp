@@ -13,6 +13,9 @@ pub struct Pos {
     pub y: i64,
 }
 impl Pos {
+    pub fn new(x: i64, y: i64) -> Self {
+        Self { x, y }
+    }
     pub fn in_dir(q: Quadrant, dist: i64) -> Self {
         Self {
             x: if q.is_west() { -dist } else { dist },

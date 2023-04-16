@@ -5,6 +5,8 @@
 #![feature(type_alias_impl_trait)]
 #![feature(ptr_sub_ptr)]
 #![feature(iter_array_chunks)]
+#![feature(int_roundings)]
+#![feature(new_uninit)]
 // lints
 #![warn(clippy::pedantic)]
 #![allow(
@@ -12,6 +14,9 @@
     clippy::return_self_not_must_use,
     clippy::items_after_statements,
     clippy::module_name_repetitions,
+    clippy::manual_range_contains,
+    clippy::bool_to_int_with_if,
+    clippy::collapsible_else_if,
     clippy::missing_panics_doc,
     clippy::missing_errors_doc // TODO remove at some point
 )]
@@ -26,6 +31,8 @@ mod ops {
     mod children;
     mod get;
     mod mc_format;
+    mod offset;
+    mod offset_norm;
     mod population;
     mod reduce;
     mod step;

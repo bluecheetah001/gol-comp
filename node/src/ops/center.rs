@@ -5,9 +5,12 @@ use crate::{Block, DepthQuad, Node, Quad};
 impl Node {
     // TODO center_at_depth is more efficnet if you can determine the goal depth ahead of time
     pub(crate) fn expand(&self) -> Node {
+        self.expand_quad().into()
+    }
+    pub(crate) fn expand_quad(&self) -> Quad<Node> {
         match self.depth_quad() {
-            DepthQuad::Leaf(leaf) => leaf.expand().into(),
-            DepthQuad::Inner(_, inner) => inner.clone().expand().into(),
+            DepthQuad::Leaf(leaf) => leaf.expand(),
+            DepthQuad::Inner(_, inner) => inner.clone().expand(),
         }
     }
     pub(crate) fn center_at_depth(&self, depth: u8) -> Node {

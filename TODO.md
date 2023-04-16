@@ -9,18 +9,26 @@
   - (C) test
 - (X) reduce
   - (C) test
-- (B) hide Block, instead expose 2d bitvec
-  - doc and test
-  - copy from rect, paste to pos
-  - depth aware full bitvec
+- (X) offset
+  - (C) test
+- (A) rotate and flip
+  - (C) test
+- (A) clip rect, clear rect
+  - (C) test
 - (C) normalize node
   - document how fns treat depth
   - should almost never need to be called, serves as a place to document assumptions
-- (D) runtime config to tune caches
+- (C) runtime config to tune caches
   - build a cache module to generalize how/what metrics are collected (hits, misses, generations)
   - evaluate alternative cache crates, possibly just getting API design right
 - (D) hide depth, instead just use width_log2 renamed as size
   - is easier to think about externally and helps prepare api for non-two-state cells
+- (D) hide Block, instead expose 2d bitvec
+  - doc and test
+  - copy from rect, paste to pos
+  - depth aware full bitvec
+  - no longer as necessary, this was primarilly alternative to directly offset and paste modes
+  - which turned out to not actually improve the API as much as I initially expected
 - (D) evaluate need to use a bigint library, are any optimized for relatively small ints? I doubt I'd get much past 100 bits, but would rather not pay for u128 everywhere
 # GUI
 - (X) image
@@ -34,5 +42,18 @@
   - numpad + to increase speed (default doubles)
   - numpad - to decrease speed
     - expressed as b*2^n
-- (X) click screen to set/clear cell
-  - display cursor position
+- (X) display cursor position
+- (A) cursor controls
+  - select (click and drag left mouse)
+    - Ctrl-C to put into clipboard
+    - Ctrl-D to clear
+    - Ctrl-X to clipboard and clear
+  - paste (Ctrl-V to enter)
+    - R to rotate CW (Shift-R for CCW)
+    - F to flip horizontal (Shift-F for vertical)
+    - Esc to leave
+    - (X) click to paste
+    - Ctrl-click to paste with xor
+  - draw (E to enter)
+    - (X) click to flip
+    - Esc to leave
