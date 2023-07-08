@@ -10,7 +10,9 @@ pub struct Block {
 }
 impl Block {
     pub const WIDTH_LOG2: u8 = 3;
-    pub const WIDTH: u64 = 1 << Block::WIDTH_LOG2;
+    pub const WIDTH: u64 = 1 << Self::WIDTH_LOG2;
+    #[allow(clippy::cast_possible_wrap)] // value much smaller than i64::MAX
+    pub const HALF_WIDTH: i64 = (Self::WIDTH / 2) as i64;
 
     pub fn empty() -> Self {
         Self { bits: 0 }

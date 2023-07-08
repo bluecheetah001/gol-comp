@@ -18,7 +18,7 @@ use std::time::{Duration, Instant};
 use eframe::egui;
 use eframe::epaint::Color32;
 use image::with_image;
-use node::{Node, Population, Pos, Quadrant};
+use node::{Node, Population, Pos, Quadrant, Rect};
 use tracing_subscriber::fmt::format::FmtSpan;
 use tracing_subscriber::EnvFilter;
 
@@ -64,6 +64,12 @@ impl eframe::App for MyApp {
     }
 }
 
+enum CursorMode {
+    Toggle,
+    Select(Option<Pos>, Rect),
+    Paste,
+}
+
 struct Board {
     node: Node,
 
@@ -82,7 +88,9 @@ struct Board {
     // /// linear scale on top of pixels_per_cell to avoid zooming too quickly
     // /// is between .707 and 1.414
     // zoom_fine: f32,
-    placing: Node,
+    cursor: CursorMode,
+    clipboard: Node,
+    // TODO move clipboard back to here
 }
 impl Board {
     const MIN_ZOOM: i8 = -70;
@@ -92,7 +100,7 @@ impl Board {
     const MAX_PLAY: i8 = 16;
     const FOOTER_HEIGHT: f32 = 10.0;
 
-    pub fn new_centered(node: Node, placing: Node) -> Self {
+    pub fn new_centered(node: Node, clipboard: Node) -> Self {
         Self {
             node,
 
@@ -108,7 +116,8 @@ impl Board {
             // TODO infer default zoom based on ui rect and node bounding box
             zoom_power: 2,
 
-            placing,
+            cursor: CursorMode::Paste,
+            clipboard,
         }
     }
 
@@ -158,7 +167,7 @@ impl egui::Widget for &mut Board {
             }
         });
 
-        // handle drag inputs
+        // handle screen drag inputs
         let pixels_per_cell = 2.0_f32.powi(self.zoom_power.into());
         let pixels_per_point = painter.ctx().pixels_per_point();
         let points_per_cell = pixels_per_cell / pixels_per_point;
@@ -180,25 +189,93 @@ impl egui::Widget for &mut Board {
         let center_point = painter
             .round_pos_to_pixels(painter.clip_rect().center() - self.center_fine * points_per_cell);
 
-        // TODO handle draw inputs
-        #[allow(clippy::cast_possible_truncation)] // did floor, floats should be small
-        let hover = response.hover_pos().map(|mouse| {
-            let mouse_cell = ((mouse - center_point) / points_per_cell).floor();
-            self.center
-                + Pos {
-                    x: mouse_cell.x as i64,
-                    y: mouse_cell.y as i64,
+        // handle cursor mode inputs
+        ui.input(|input| {
+            if input.key_pressed(egui::Key::C) || input.key_pressed(egui::Key::X) {
+                if let CursorMode::Select(_, rect) = self.cursor {
+                    if !rect.is_empty() {
+                        let node = self.node.clip(rect);
+                        // TODO using offset_norm to center isn't really ideal
+                        // but is better than nothing
+                        let (_, node) = node.offset_norm();
+                        self.clipboard = node;
+                    }
                 }
+            }
+            if input.key_pressed(egui::Key::D) || input.key_pressed(egui::Key::X) {
+                if let CursorMode::Select(_, rect) = self.cursor {
+                    if !rect.is_empty() {
+                        self.node = self.node.clear(rect);
+                    }
+                }
+            }
+            if input.key_pressed(egui::Key::V) {
+                self.cursor = CursorMode::Paste;
+            }
+            if input.key_pressed(egui::Key::R) {
+                if input.modifiers.shift {
+                    self.clipboard = self.clipboard.rotate_ccw();
+                } else {
+                    self.clipboard = self.clipboard.rotate_cw();
+                }
+            }
+            if input.key_pressed(egui::Key::F) {
+                if input.modifiers.shift {
+                    self.clipboard = self.clipboard.flip_v();
+                } else {
+                    self.clipboard = self.clipboard.flip_h();
+                }
+            }
+            if input.key_pressed(egui::Key::E) {
+                self.cursor = CursorMode::Toggle;
+            }
+            if input.key_pressed(egui::Key::V) {
+                self.cursor = CursorMode::Paste;
+            }
+            if input.key_pressed(egui::Key::Escape) {
+                self.cursor = CursorMode::Select(None, Rect::NOTHING);
+            }
         });
-        if let Some(hover) = hover {
-            if self.zoom_power >= 0 && response.clicked_by(egui::PointerButton::Primary) {
-                // if cursor == Toggle
-                // TODO flip operation?
-                // TODO .set and .step ect could also work with &mut
-                // self.node = self.node.set(hover, !self.node.get(hover));
 
-                // if cursor == Paste, mode == Or
-                self.node = self.node.or(&self.placing.offset(hover));
+        // handle clicks
+        #[allow(clippy::cast_possible_truncation)] // did floor, floats should be small
+        let hover = if self.zoom_power >= 0 {
+            response.hover_pos().map(|mouse| {
+                let mouse_cell = ((mouse - center_point) / points_per_cell).floor();
+                self.center
+                    + Pos {
+                        x: mouse_cell.x as i64,
+                        y: mouse_cell.y as i64,
+                    }
+            })
+        } else {
+            // TODO large area hover mode?
+            None
+        };
+        if let Some(hover) = hover {
+            match &mut self.cursor {
+                CursorMode::Toggle => {
+                    if response.clicked_by(egui::PointerButton::Primary) {
+                        // TODO toggle fn?
+                        self.node = self.node.set(hover, !self.node.get(hover));
+                    }
+                }
+                CursorMode::Paste => {
+                    if response.clicked_by(egui::PointerButton::Primary) {
+                        // TODO xor?
+                        self.node = self.node.or(&self.clipboard.offset(hover));
+                    }
+                }
+                CursorMode::Select(pos, rect) => {
+                    if response.drag_started_by(egui::PointerButton::Primary) {
+                        *pos = Some(hover);
+                    }
+                    if let Some(pos) = pos {
+                        if response.dragged_by(egui::PointerButton::Primary) {
+                            *rect = Rect::new(*pos, hover);
+                        }
+                    }
+                }
             }
         }
 
@@ -241,16 +318,29 @@ impl egui::Widget for &mut Board {
                 &self.node,
                 Color32::WHITE,
             );
-            // if cursor == Paste
             if let Some(hover) = hover {
-                paint_node(
-                    &painter,
-                    center_point,
-                    points_per_cell,
-                    -self.center + hover,
-                    &self.placing,
-                    Color32::from_rgba_premultiplied(0, 0, 255, 128),
-                );
+                match &self.cursor {
+                    CursorMode::Toggle => {}
+                    CursorMode::Paste => {
+                        paint_node(
+                            &painter,
+                            center_point,
+                            points_per_cell,
+                            -self.center + hover,
+                            &self.clipboard,
+                            Color32::from_rgba_premultiplied(0, 0, 255, 128),
+                        );
+                    }
+                    CursorMode::Select(_, rect) => {
+                        paint_rect(
+                            &painter,
+                            center_point,
+                            points_per_cell,
+                            *rect,
+                            Color32::from_rgba_premultiplied(0, 128, 255, 128),
+                        );
+                    }
+                }
             }
         } else {
             let node = self.node.reduce_by(self.zoom_power.unsigned_abs());
@@ -344,4 +434,29 @@ fn paint_node(
             painter.image(image, rect, uv, color);
         });
     }
+}
+
+#[allow(clippy::cast_precision_loss)] // positions should be small
+fn paint_rect(
+    painter: &egui::Painter,
+    center_point: egui::Pos2,
+    points_per_cell: f32,
+    rect: Rect,
+    color: Color32,
+) {
+    if rect.is_empty() {
+        return;
+    }
+    let min = center_point
+        + egui::vec2(
+            rect.west() as f32 * points_per_cell,
+            rect.north() as f32 * points_per_cell,
+        );
+    let max = center_point
+        + egui::vec2(
+            rect.east() as f32 * points_per_cell,
+            rect.south() as f32 * points_per_cell,
+        );
+    let egui_rect = egui::Rect::from_min_max(min, max);
+    painter.rect_filled(egui_rect, 0.0, color);
 }

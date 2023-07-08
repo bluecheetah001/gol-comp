@@ -1,117 +1,148 @@
 use crate::{DepthQuad, Node, Population, Pos, Quad};
 
 impl Node {
-    fn offset_norm(&self) -> (Pos, Self) {
+    /// returned Node's 0,0 is at returned Pos in self's coordinate space
+    pub fn offset_norm(&self) -> (Pos, Self) {
         self.inner()
-            .and_then(|inner| inner.as_ref().offset_norm())
+            .and_then(Quad::offset_norm)
             .unwrap_or_else(|| (Pos::new(0, 0), self.clone()))
     }
-}
+    fn offset_norm_plus(&self, pos: Pos) -> (Pos, Self) {
+        let (pos2, node) = self.offset_norm();
+        (pos + pos2, node)
+    }
 
-impl Quad<&Node> {
-    #[allow(clippy::too_many_lines)]
-    fn offset_norm(self) -> Option<(Pos, Node)> {
-        #[allow(clippy::unnecessary_wraps)]
-        fn recurse(pos: Pos, node: &Node) -> Option<(Pos, Node)> {
-            let (pos2, node) = node.offset_norm();
-            Some((pos + pos2, node))
-        }
-        fn recurse_v(x: i64, n: &Node, s: &Node) -> Option<(Pos, Node)> {
-            match (n.depth_quad(), s.depth_quad()) {
-                (DepthQuad::Leaf(n), DepthQuad::Leaf(s)) => {
-                    if n.nw.is_empty() && n.ne.is_empty() && s.sw.is_empty() && s.se.is_empty() {
-                        Some((
-                            Pos::new(x, 0),
-                            Quad {
-                                nw: n.sw,
-                                ne: n.se,
-                                sw: s.nw,
-                                se: s.ne,
-                            }
-                            .into(),
-                        ))
-                    } else {
-                        None
-                    }
-                }
-                (DepthQuad::Inner(_, n), DepthQuad::Inner(_, s)) => {
-                    if n.nw.is_empty() && n.ne.is_empty() && s.sw.is_empty() && s.se.is_empty() {
-                        let pos = Pos::new(x, 0);
-                        let inner = Quad {
-                            nw: &n.sw,
-                            ne: &n.se,
-                            sw: &s.nw,
-                            se: &s.ne,
-                        };
-                        if let Some((pos2, node)) = inner.offset_norm() {
-                            Some((pos + pos2, node))
-                        } else {
-                            Some((pos, inner.cloned().into()))
-                        }
-                    } else {
-                        None
-                    }
-                }
-                _ => panic!("inconsistent depth"),
+    /// layed out in reading order just like Block
+    /// padded to 16 bits so that this can be shifted and unioned with 3 other nodes
+    /// high bits
+    ///  0  0  0  0
+    ///  0  0  0  0
+    ///  0  0 nw ne
+    ///  0  0 sw se
+    /// low bits
+    fn filled_flags(&self) -> u16 {
+        match self.depth_quad() {
+            DepthQuad::Leaf(leaf) => {
+                let nw = if leaf.nw.is_empty() { 0 } else { 32 };
+                let ne = if leaf.ne.is_empty() { 0 } else { 16 };
+                let sw = if leaf.ne.is_empty() { 0 } else { 2 };
+                let se = if leaf.ne.is_empty() { 0 } else { 1 };
+                nw | ne | sw | se
             }
-        }
-        fn recurse_h(y: i64, w: &Node, e: &Node) -> Option<(Pos, Node)> {
-            match (w.depth_quad(), e.depth_quad()) {
-                (DepthQuad::Leaf(w), DepthQuad::Leaf(e)) => {
-                    if w.nw.is_empty() && w.sw.is_empty() && e.ne.is_empty() && e.se.is_empty() {
-                        Some((
-                            Pos::new(0, y),
-                            Quad {
-                                nw: w.ne,
-                                ne: e.nw,
-                                sw: w.se,
-                                se: e.sw,
-                            }
-                            .into(),
-                        ))
-                    } else {
-                        None
-                    }
-                }
-                (DepthQuad::Inner(_, w), DepthQuad::Inner(_, e)) => {
-                    if w.nw.is_empty() && w.sw.is_empty() && e.ne.is_empty() && e.se.is_empty() {
-                        let pos = Pos::new(0, y);
-                        let inner = Quad {
-                            nw: &w.ne,
-                            ne: &e.nw,
-                            sw: &w.se,
-                            se: &e.sw,
-                        };
-                        if let Some((pos2, node)) = inner.offset_norm() {
-                            Some((pos + pos2, node))
-                        } else {
-                            Some((pos, inner.cloned().into()))
-                        }
-                    } else {
-                        None
-                    }
-                }
-                _ => panic!("inconsistent depth"),
+            DepthQuad::Inner(_, inner) => {
+                let nw = if inner.nw.is_empty() { 0 } else { 32 };
+                let ne = if inner.ne.is_empty() { 0 } else { 16 };
+                let sw = if inner.ne.is_empty() { 0 } else { 2 };
+                let se = if inner.ne.is_empty() { 0 } else { 1 };
+                nw | ne | sw | se
             }
-        }
-
-        let nw = if self.nw.is_empty() { 0 } else { 8 };
-        let ne = if self.ne.is_empty() { 0 } else { 4 };
-        let sw = if self.sw.is_empty() { 0 } else { 2 };
-        let se = if self.se.is_empty() { 0 } else { 1 };
-        #[allow(clippy::cast_possible_wrap)] // not max depth
-        let half_width = self.nw.width() as i64;
-        match nw | ne | sw | se {
-            0 => Some((Pos::new(0, 0), Node::empty(0))),
-            1 => recurse(Pos::new(half_width, half_width), self.se),
-            2 => recurse(Pos::new(half_width, -half_width), self.sw),
-            3 => recurse_h(half_width, self.sw, self.se),
-            4 => recurse(Pos::new(-half_width, half_width), self.ne),
-            5 => recurse_v(half_width, self.ne, self.se),
-            8 => recurse(Pos::new(-half_width, -half_width), self.nw),
-            10 => recurse_v(-half_width, self.nw, self.sw),
-            12 => recurse_h(-half_width, self.nw, self.ne),
-            _ => todo!("check if center buffered"),
         }
     }
 }
+
+impl Quad<Node> {
+    fn offset_norm(&self) -> Option<(Pos, Node)> {
+        let filled_flags = (self.nw.filled_flags() << 6)
+            | (self.ne.filled_flags() << 4)
+            | (self.sw.filled_flags() << 2)
+            | self.se.filled_flags();
+        // if one is None and the other is Max or Min, then could center it even though it wouldn't be smaller
+        let case_v = JoinCase::from_filled_v(filled_flags)?;
+        let case_h = JoinCase::from_filled_h(filled_flags)?;
+
+        let w = case_v.join_v(&self.nw, &self.sw);
+        let e = case_v.join_v(&self.ne, &self.se);
+        let node = case_h.join_h(&w, &e);
+        let pos = Pos::new(
+            case_h.offset(node.half_width()),
+            case_v.offset(node.half_width()),
+        );
+        Some(node.offset_norm_plus(pos))
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+enum JoinCase {
+    Min,
+    Mid,
+    Max,
+}
+impl JoinCase {
+    fn from_filled_v(flags: u16) -> Option<Self> {
+        let flags = flags | (flags >> 1);
+        let flags = flags | (flags >> 2);
+        match flags & 0x1111 {
+            0x0000 | 0x0010 | 0x0100 | 0x0110 => Some(JoinCase::Mid),
+            0x1100 | 0x1000 => Some(JoinCase::Min),
+            0x0011 | 0x0001 => Some(JoinCase::Max),
+            _ => None,
+        }
+    }
+    fn from_filled_h(flags: u16) -> Option<Self> {
+        let flags = flags | (flags >> 4);
+        let flags = flags | (flags >> 8);
+        match flags & 0b1111 {
+            0b0000 | 0b0010 | 0b0100 | 0b0110 => Some(JoinCase::Mid),
+            0b1100 | 0b1000 => Some(JoinCase::Min),
+            0b0011 | 0b0001 => Some(JoinCase::Max),
+            _ => None,
+        }
+    }
+    fn offset(self, amount: i64) -> i64 {
+        match self {
+            JoinCase::Min => -amount,
+            JoinCase::Mid => 0,
+            JoinCase::Max => amount,
+        }
+    }
+    fn join_v(self, n: &Node, s: &Node) -> Node {
+        match self {
+            JoinCase::Min => n.clone(),
+            JoinCase::Max => s.clone(),
+            JoinCase::Mid => match (n.depth_quad(), s.depth_quad()) {
+                (DepthQuad::Leaf(n), DepthQuad::Leaf(s)) => Node::new_leaf(Quad {
+                    nw: n.sw,
+                    ne: n.se,
+                    sw: s.nw,
+                    se: s.ne,
+                }),
+                (DepthQuad::Inner(depth, n), DepthQuad::Inner(_, s)) => Node::new_depth_inner(
+                    *depth,
+                    Quad {
+                        nw: n.sw.clone(),
+                        ne: n.se.clone(),
+                        sw: s.nw.clone(),
+                        se: s.ne.clone(),
+                    },
+                ),
+                _ => panic!("inconsistent depth"),
+            },
+        }
+    }
+    fn join_h(self, w: &Node, e: &Node) -> Node {
+        match self {
+            JoinCase::Min => w.clone(),
+            JoinCase::Max => e.clone(),
+            JoinCase::Mid => match (w.depth_quad(), e.depth_quad()) {
+                (DepthQuad::Leaf(w), DepthQuad::Leaf(e)) => Node::new_leaf(Quad {
+                    nw: w.ne,
+                    ne: e.nw,
+                    sw: w.se,
+                    se: e.sw,
+                }),
+                (DepthQuad::Inner(depth, w), DepthQuad::Inner(_, e)) => Node::new_depth_inner(
+                    *depth,
+                    Quad {
+                        nw: w.ne.clone(),
+                        ne: e.nw.clone(),
+                        sw: w.se.clone(),
+                        se: e.sw.clone(),
+                    },
+                ),
+                _ => panic!("inconsistent depth"),
+            },
+        }
+    }
+}
+
+// TODO testing!

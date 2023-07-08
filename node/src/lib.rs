@@ -25,16 +25,19 @@ mod block;
 mod node;
 mod pos;
 mod quad;
+mod rect;
 mod ops {
     mod bit;
     mod center;
     mod children;
+    mod clip;
     mod get;
     mod mc_format;
     mod offset;
     mod offset_norm;
     mod population;
     mod reduce;
+    mod rotate;
     mod step;
     mod test_format;
 
@@ -48,3 +51,4 @@ pub use block::*;
 pub use ops::*;
 pub use pos::*;
 pub use quad::*;
+pub use rect::*;

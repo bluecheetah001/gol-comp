@@ -11,7 +11,7 @@
   - (C) test
 - (X) offset
   - (C) test
-- (A) rotate and flip
+- (X) rotate and flip
   - (C) test
 - (A) clip rect, clear rect
   - (C) test
@@ -45,15 +45,15 @@
 - (X) display cursor position
 - (A) cursor controls
   - select (click and drag left mouse)
-    - Ctrl-C to put into clipboard
-    - Ctrl-D to clear
-    - Ctrl-X to clipboard and clear
-  - paste (Ctrl-V to enter)
+    - C to put into clipboard
+    - D to clear
+    - X to clipboard and clear
+  - (X) paste (V to enter)
     - R to rotate CW (Shift-R for CCW)
     - F to flip horizontal (Shift-F for vertical)
     - Esc to leave
-    - (X) click to paste
-    - Ctrl-click to paste with xor
-  - draw (E to enter)
-    - (X) click to flip
+    - click to paste
+    - (B) Ctrl-click to paste with xor
+  - (X) draw (E to enter)
+    - click to flip
     - Esc to leave
