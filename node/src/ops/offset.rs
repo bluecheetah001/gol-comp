@@ -2,6 +2,8 @@ use crate::{Block, DepthQuad, Node, Pos, Quad};
 
 // TODO memoize? or if not then special case empty
 
+// TODO if this was normalizing then offset_norm wouldn't be as necessary
+
 impl Node {
     #[allow(clippy::cast_sign_loss)] // is checked for
     pub fn offset(&self, amount: Pos) -> Self {
@@ -239,32 +241,6 @@ mod test {
                 Block::from_rows(0x01_01_01_01_01_01_01_01),
                 Block::empty(),
                 Block::from_rows(0xff_00_00_00_00_00_00_00),
-                Block::empty(),
-            ),
-        );
-        let expand = Node::new(
-            Node::new(
-                Block::empty(),
-                Block::empty(),
-                Block::empty(),
-                Block::from_rows(0xff_80_80_80_80_80_80_80),
-            ),
-            Node::new(
-                Block::empty(),
-                Block::empty(),
-                Block::from_rows(0xff_01_01_01_01_01_01_01),
-                Block::empty(),
-            ),
-            Node::new(
-                Block::empty(),
-                Block::from_rows(0x80_80_80_80_80_80_80_ff),
-                Block::empty(),
-                Block::empty(),
-            ),
-            Node::new(
-                Block::from_rows(0x01_01_01_01_01_01_01_ff),
-                Block::empty(),
-                Block::empty(),
                 Block::empty(),
             ),
         );

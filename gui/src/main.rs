@@ -332,13 +332,17 @@ impl egui::Widget for &mut Board {
                         );
                     }
                     CursorMode::Select(_, rect) => {
-                        paint_rect(
-                            &painter,
-                            center_point,
-                            points_per_cell,
-                            *rect,
-                            Color32::from_rgba_premultiplied(0, 128, 255, 128),
-                        );
+                        if !rect.is_empty() {
+                            let mut rect = *rect;
+                            rect.offset(-self.center);
+                            paint_rect(
+                                &painter,
+                                center_point,
+                                points_per_cell,
+                                rect,
+                                Color32::from_rgba_premultiplied(0, 128, 255, 128),
+                            );
+                        }
                     }
                 }
             }
@@ -454,8 +458,8 @@ fn paint_rect(
         );
     let max = center_point
         + egui::vec2(
-            rect.east() as f32 * points_per_cell,
-            rect.south() as f32 * points_per_cell,
+            (rect.east() as f32 + 1.0) * points_per_cell,
+            (rect.south() as f32 + 1.0) * points_per_cell,
         );
     let egui_rect = egui::Rect::from_min_max(min, max);
     painter.rect_filled(egui_rect, 0.0, color);

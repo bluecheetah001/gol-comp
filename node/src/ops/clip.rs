@@ -17,6 +17,8 @@ impl Node {
     fn clip_in_bounds(&self, rect: Rect) -> Node {
         if rect.is_empty() {
             Node::empty(self.depth())
+        } else if rect == self.trivial_bounding_rect() {
+            self.clone()
         } else {
             match self.depth_quad() {
                 DepthQuad::Leaf(leaf) => Node::new_leaf(leaf.clip_in_bounds(rect)),
@@ -29,6 +31,8 @@ impl Node {
     fn clear_in_bounds(&self, rect: Rect) -> Node {
         if rect.is_empty() {
             self.clone()
+        } else if rect == self.trivial_bounding_rect() {
+            Node::empty(self.depth())
         } else {
             match self.depth_quad() {
                 DepthQuad::Leaf(leaf) => Node::new_leaf(leaf.clear_in_bounds(rect)),
@@ -83,42 +87,49 @@ impl Quad<Block> {
 
 impl Block {
     fn clip_in_bounds(self, rect: Rect) -> Block {
-        let rows = self.to_rows();
-        let mask = rect.to_block_rows();
-        Self::from_rows(rows & mask)
+        if rect.is_empty() {
+            Self::empty()
+        } else {
+            let rows = self.to_rows();
+            let mask = rect.to_block_rows();
+            Self::from_rows(rows & mask)
+        }
     }
     fn clear_in_bounds(self, rect: Rect) -> Block {
-        let rows = self.to_rows();
-        let mask = rect.to_block_rows();
-        Self::from_rows(rows & !mask)
+        if rect.is_empty() {
+            self
+        } else {
+            let rows = self.to_rows();
+            let mask = rect.to_block_rows();
+            Self::from_rows(rows & !mask)
+        }
     }
 }
 impl Rect {
     fn nw_shifted(&self, amount: i64) -> Rect {
         let mut rect = *self;
-        rect.set_east(-1);
-        rect.set_south(-1);
+        rect.intersection(Rect::min_max(
+            Pos::new(i64::MIN, i64::MIN),
+            Pos::new(-1, -1),
+        ));
         rect.offset(Pos::new(amount, amount));
         rect
     }
     fn ne_shifted(&self, amount: i64) -> Rect {
         let mut rect = *self;
-        rect.set_west(0);
-        rect.set_south(-1);
+        rect.intersection(Rect::min_max(Pos::new(0, i64::MIN), Pos::new(i64::MAX, -1)));
         rect.offset(Pos::new(-amount, amount));
         rect
     }
     fn sw_shifted(&self, amount: i64) -> Rect {
         let mut rect = *self;
-        rect.set_east(-1);
-        rect.set_north(0);
+        rect.intersection(Rect::min_max(Pos::new(i64::MIN, 0), Pos::new(-1, i64::MAX)));
         rect.offset(Pos::new(amount, -amount));
         rect
     }
     fn se_shifted(&self, amount: i64) -> Rect {
         let mut rect = *self;
-        rect.set_west(0);
-        rect.set_north(0);
+        rect.intersection(Rect::min_max(Pos::new(0, 0), Pos::new(i64::MAX, i64::MAX)));
         rect.offset(Pos::new(-amount, -amount));
         rect
     }
@@ -154,4 +165,91 @@ impl Rect {
     }
 }
 
-// TODO testing!
+#[cfg(test)]
+mod test {
+    use crate::{Block, Node, Pos, Rect};
+
+    #[test]
+    pub fn centered() {
+        let base = Node::new(
+            Block::from_rows(0x01_01_01_01_01_01_01_ff),
+            Block::from_rows(0x80_80_80_80_80_80_80_ff),
+            Block::from_rows(0xff_01_01_01_01_01_01_01),
+            Block::from_rows(0xff_80_80_80_80_80_80_80),
+        );
+        let actual = base.clip(Rect::new(Pos::new(-2, -3), Pos::new(4, 3)));
+        let expected = Node::new(
+            Block::from_rows(0x00_00_00_00_00_01_01_03),
+            Block::from_rows(0x00_00_00_00_00_80_80_f8),
+            Block::from_rows(0x03_01_01_01_00_00_00_00),
+            Block::from_rows(0xf8_80_80_80_00_00_00_00),
+        );
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
+    pub fn se_corner() {
+        let base = Node::new(
+            Block::from_rows(0xff_ff_ff_ff_ff_ff_ff_ff),
+            Block::from_rows(0xff_ff_ff_ff_ff_ff_ff_ff),
+            Block::from_rows(0xff_ff_ff_ff_ff_ff_ff_ff),
+            Block::from_rows(0xff_ff_ff_ff_ff_ff_ff_ff),
+        );
+        let actual = base.clip(Rect::new(Pos::new(3, 2), Pos::new(6, 4)));
+        let expected = Node::new(
+            Block::from_rows(0x00_00_00_00_00_00_00_00),
+            Block::from_rows(0x00_00_00_00_00_00_00_00),
+            Block::from_rows(0x00_00_00_00_00_00_00_00),
+            Block::from_rows(0x00_00_1e_1e_1e_00_00_00),
+        );
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
+    pub fn big() {
+        let leaf = Node::new(
+            Block::from_rows(0x01_01_01_01_01_01_01_ff),
+            Block::from_rows(0x80_80_80_80_80_80_80_ff),
+            Block::from_rows(0xff_01_01_01_01_01_01_01),
+            Block::from_rows(0xff_80_80_80_80_80_80_80),
+        );
+        let base = Node::new(leaf.clone(), leaf.clone(), leaf.clone(), leaf);
+        let leaf_clip = Node::new(
+            Block::from_rows(0x00_00_00_00_00_01_01_03),
+            Block::from_rows(0x00_00_00_00_00_80_80_f8),
+            Block::from_rows(0x03_01_01_01_00_00_00_00),
+            Block::from_rows(0xf8_80_80_80_00_00_00_00),
+        );
+        assert_eq!(
+            base.clip(Rect::new(Pos::new(-10, -11), Pos::new(-4, -5))),
+            Node::new(
+                leaf_clip.clone(),
+                Node::empty(0),
+                Node::empty(0),
+                Node::empty(0)
+            )
+        );
+        assert_eq!(
+            base.clip(Rect::new(Pos::new(6, -11), Pos::new(12, -5))),
+            Node::new(
+                Node::empty(0),
+                leaf_clip.clone(),
+                Node::empty(0),
+                Node::empty(0)
+            )
+        );
+        assert_eq!(
+            base.clip(Rect::new(Pos::new(-10, 5), Pos::new(-4, 11))),
+            Node::new(
+                Node::empty(0),
+                Node::empty(0),
+                leaf_clip.clone(),
+                Node::empty(0)
+            )
+        );
+        assert_eq!(
+            base.clip(Rect::new(Pos::new(6, 5), Pos::new(12, 11))),
+            Node::new(Node::empty(0), Node::empty(0), Node::empty(0), leaf_clip)
+        );
+    }
+}

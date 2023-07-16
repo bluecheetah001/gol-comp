@@ -19,21 +19,21 @@ impl Node {
     ///  0  0  0  0
     ///  0  0 nw ne
     ///  0  0 sw se
-    /// low bits
+    ///    low bits
     fn filled_flags(&self) -> u16 {
         match self.depth_quad() {
             DepthQuad::Leaf(leaf) => {
                 let nw = if leaf.nw.is_empty() { 0 } else { 32 };
                 let ne = if leaf.ne.is_empty() { 0 } else { 16 };
-                let sw = if leaf.ne.is_empty() { 0 } else { 2 };
-                let se = if leaf.ne.is_empty() { 0 } else { 1 };
+                let sw = if leaf.sw.is_empty() { 0 } else { 2 };
+                let se = if leaf.se.is_empty() { 0 } else { 1 };
                 nw | ne | sw | se
             }
             DepthQuad::Inner(_, inner) => {
                 let nw = if inner.nw.is_empty() { 0 } else { 32 };
                 let ne = if inner.ne.is_empty() { 0 } else { 16 };
-                let sw = if inner.ne.is_empty() { 0 } else { 2 };
-                let se = if inner.ne.is_empty() { 0 } else { 1 };
+                let sw = if inner.sw.is_empty() { 0 } else { 2 };
+                let se = if inner.se.is_empty() { 0 } else { 1 };
                 nw | ne | sw | se
             }
         }
@@ -42,8 +42,8 @@ impl Node {
 
 impl Quad<Node> {
     fn offset_norm(&self) -> Option<(Pos, Node)> {
-        let filled_flags = (self.nw.filled_flags() << 6)
-            | (self.ne.filled_flags() << 4)
+        let filled_flags = (self.nw.filled_flags() << 10)
+            | (self.ne.filled_flags() << 8)
             | (self.sw.filled_flags() << 2)
             | self.se.filled_flags();
         // if one is None and the other is Max or Min, then could center it even though it wouldn't be smaller
@@ -145,4 +145,24 @@ impl JoinCase {
     }
 }
 
-// TODO testing!
+#[cfg(test)]
+mod test {
+    use crate::{Block, Node, Pos};
+
+    #[test]
+    pub fn basic() {
+        let block = Block::from_rows(1);
+        let leaf = Node::new(block, block, block, block);
+        let nw = Node::new(leaf.clone(), Node::empty(0), Node::empty(0), Node::empty(0));
+        assert_eq!(nw.offset_norm(), (Pos::new(-8, -8), leaf.clone()));
+
+        let ne = Node::new(Node::empty(0), leaf.clone(), Node::empty(0), Node::empty(0));
+        assert_eq!(ne.offset_norm(), (Pos::new(8, -8), leaf.clone()));
+
+        let sw = Node::new(Node::empty(0), Node::empty(0), leaf.clone(), Node::empty(0));
+        assert_eq!(sw.offset_norm(), (Pos::new(-8, 8), leaf.clone()));
+
+        let se = Node::new(Node::empty(0), Node::empty(0), Node::empty(0), leaf.clone());
+        assert_eq!(se.offset_norm(), (Pos::new(8, 8), leaf));
+    }
+}
