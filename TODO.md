@@ -13,7 +13,7 @@
   - (C) test
 - (X) rotate and flip
   - (C) test
-- (A) clip rect, clear rect
+- (X) clip rect, clear rect
   - (C) test
 - (C) normalize node
   - document how fns treat depth
@@ -43,17 +43,9 @@
   - numpad - to decrease speed
     - expressed as b*2^n
 - (X) display cursor position
-- (A) cursor controls
-  - select (click and drag left mouse)
-    - C to put into clipboard
-    - D to clear
-    - X to clipboard and clear
-  - (X) paste (V to enter)
-    - R to rotate CW (Shift-R for CCW)
-    - F to flip horizontal (Shift-F for vertical)
-    - Esc to leave
-    - click to paste
-    - (B) Ctrl-click to paste with xor
-  - (X) draw (E to enter)
-    - click to flip
-    - Esc to leave
+- (X) cursor controls
+  - copy, cut, paste
+  - (B) xor paste option
+  - rotate, flip
+  - toggle
+  - icons to show mode

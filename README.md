@@ -1,11 +1,18 @@
 ## GUI help
 - can move display by dragging with right mouse button
-- can zoom in with I and out with O when focused on board
+- can zoom in with `I` and out with `O` when focused on board
   - center of board will stay in the same location
-- can step once with Space
+- can step once with `Space`
   - has a base step size that currently cannot be configured
-- can play/pause with Enter
-  - can increase speed with + and decrease with -
+- can play/pause with `Enter`
+  - can increase speed with `+` and decrease with `-`
   - can be less than one step per frame, in which case it delays based on real time
-- can flip a single cell with left mouse click
-  - cannot do so when zoomed out
+- cursor modes: (only when zoomed in to see individual cells)
+  - `Escape` - select area with left mouse button
+    - `C` - copy selected area into clipboard
+    - `D` - clear selected area
+    - `X` - copy and delete selected area
+  - `E` - toggle cells with left mouse click
+  - `V` - paste clipboard with left mouse click
+    - `R` - rotate CW, `Shift+R` to rotate CCW
+    - `F` - flip horizontally, `Shift+F` to flip vertically

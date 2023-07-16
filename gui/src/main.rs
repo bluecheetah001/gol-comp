@@ -184,6 +184,8 @@ impl egui::Widget for &mut Board {
             let center_y_floor = self.center_fine.y.floor();
             self.center_fine.y -= center_y_floor;
             self.center.y += center_y_floor as i64;
+
+            ui.ctx().set_cursor_icon(egui::CursorIcon::Grabbing);
         }
 
         let center_point = painter
@@ -236,6 +238,13 @@ impl egui::Widget for &mut Board {
                 self.cursor = CursorMode::Select(None, Rect::NOTHING);
             }
         });
+        if response.hovered() && !response.dragged_by(egui::PointerButton::Secondary) {
+            ui.ctx().set_cursor_icon(match self.cursor {
+                CursorMode::Toggle => egui::CursorIcon::Crosshair,
+                CursorMode::Select(_, _) => egui::CursorIcon::Default,
+                CursorMode::Paste => egui::CursorIcon::PointingHand,
+            });
+        }
 
         // handle clicks
         #[allow(clippy::cast_possible_truncation)] // did floor, floats should be small
