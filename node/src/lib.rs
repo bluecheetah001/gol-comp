@@ -1,12 +1,10 @@
 #![feature(let_chains)]
-#![feature(const_option)]
-#![feature(local_key_cell_methods)]
 #![feature(assert_matches)]
 #![feature(type_alias_impl_trait)]
 #![feature(ptr_sub_ptr)]
 #![feature(iter_array_chunks)]
 #![feature(int_roundings)]
-#![feature(new_uninit)]
+#![feature(impl_trait_in_assoc_type)]
 // lints
 #![warn(clippy::pedantic)]
 #![allow(

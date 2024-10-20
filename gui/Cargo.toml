@@ -4,10 +4,10 @@ version = "0.0.0"
 edition = "2021"
 
 [dependencies]
-eframe = "0.21.3"
-lru = "0.10.0"
-itertools = "0.10.5"
+eframe = "0.29.1"
+lru = "0.12.5"
+itertools = "0.13.0"
 node = { path = "../node" }
-bit-iter = "1.1.1"
-tracing = "0.1.37"
-tracing-subscriber = { version = "0.3.16", features = ["time", "env-filter"] }
+bit-iter = "1.2.0"
+tracing = "0.1.40"
+tracing-subscriber = { version = "0.3.18", features = ["time", "env-filter"] }

@@ -15,7 +15,7 @@ use std::fs;
 use std::num::NonZeroU64;
 use std::time::{Duration, Instant};
 
-use eframe::egui;
+use eframe::egui::{self, ViewportBuilder};
 use eframe::epaint::Color32;
 use image::with_image;
 use node::{Node, Population, Pos, Quadrant, Rect};
@@ -31,14 +31,18 @@ fn main() -> Result<(), eframe::Error> {
         .init();
 
     let options = eframe::NativeOptions {
-        initial_window_size: Some(egui::vec2(1000.0, 1000.0)),
+        viewport: egui::ViewportBuilder {
+            inner_size: Some(egui::vec2(1000.0, 1000.0)),
+            ..Default::default()
+        },
         ..Default::default()
     };
     eframe::run_native(
         "My egui App",
         options,
-        Box::new(|_cc| Box::new(MyApp::default())),
-    )
+        Box::new(|_cc| Ok(Box::new(MyApp::default()))),
+    )?;
+    Ok(())
 }
 
 struct MyApp {
@@ -159,7 +163,7 @@ impl egui::Widget for &mut Board {
                 step_once = !self.play;
                 self.play = false;
             }
-            if input.key_pressed(egui::Key::PlusEquals) && self.play_power < Board::MAX_PLAY {
+            if input.key_pressed(egui::Key::Equals) && self.play_power < Board::MAX_PLAY {
                 self.play_power += 1;
             }
             if input.key_pressed(egui::Key::Minus) && self.play_power > Board::MIN_PLAY {
@@ -316,6 +320,9 @@ impl egui::Widget for &mut Board {
             let remaining = self.last_time + self.slow_play_delay() - now;
             ui.ctx().request_repaint_after(remaining);
         }
+
+        // draw background
+        painter.rect_filled(response.rect, 0.0, Color32::BLACK);
 
         // draw node
         if self.zoom_power >= 0 {
