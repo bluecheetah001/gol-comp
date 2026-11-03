@@ -6,7 +6,7 @@ pub trait Population {
     fn population(&self) -> u64;
     fn is_empty(&self) -> bool;
 }
-impl<'a, T> Population for &'a T
+impl<T> Population for &'_ T
 where
     T: Population,
 {

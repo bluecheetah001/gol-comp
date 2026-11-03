@@ -11,7 +11,7 @@ const LRU_CACHE_SIZE: NonZeroUsize = NonZeroUsize::new(1 << 24).unwrap();
 //      xor directly implement Quad<Quad<Block>>::step_center()
 struct StepCache {
     lru: LruCache<(Node, NonZeroU64), Node>,
-    // it's a bit weird to store this 'globally' and periodicaly reset them
+    // it's a bit weird to store this 'globally' and periodically reset them
     // but it means it won't be hard to modify reporting to dump this once a second or every 100 calls ect
     // and with a bit of cleanup could track more interesting stats (like breaking this down per depth )
     hit: u32,
@@ -68,7 +68,7 @@ impl Node {
         // so we need 2 buffer nodes that are both >= min_depth
         // so we unbuffer given node so it is >= min_depth - 1
         let min_depth = steps_to_min_depth(steps);
-        let depth = self.unbufferd_depth(min_depth - 1) + 2;
+        let depth = self.unbuffered_depth(min_depth - 1) + 2;
 
         let _span = trace_span!("step", depth, steps).entered();
 
@@ -84,8 +84,8 @@ impl Node {
         })
     }
     // find the smallest depth where the node is unbuffered, maxed with target_depth
-    fn unbufferd_depth(&self, target_depth: u8) -> u8 {
-        fn unbufferd_depth_inner(inner: Quad<&Node>, target_depth: u8) -> u8 {
+    fn unbuffered_depth(&self, target_depth: u8) -> u8 {
+        fn unbuffered_depth_inner(inner: Quad<&Node>, target_depth: u8) -> u8 {
             let child_depth = inner.nw.depth();
             if child_depth < target_depth {
                 target_depth
@@ -93,7 +93,7 @@ impl Node {
                 match inner.children() {
                     DepthQuad::Leaf(leaf) if leaf.is_buffered() => child_depth,
                     DepthQuad::Inner(_, inner) if inner.is_buffered() => {
-                        unbufferd_depth_inner(inner.center(), target_depth)
+                        unbuffered_depth_inner(inner.center(), target_depth)
                     }
                     _ => child_depth + 1,
                 }
@@ -104,7 +104,7 @@ impl Node {
         if node_depth <= target_depth {
             target_depth
         } else {
-            unbufferd_depth_inner(self.inner().unwrap().as_ref(), target_depth)
+            unbuffered_depth_inner(self.inner().unwrap().as_ref(), target_depth)
         }
     }
 }
@@ -301,7 +301,7 @@ impl Quad<Block> {
             shape_north(self.sw.to_rows(), self.se.to_rows()),
             shape_south(self.sw.to_rows(), self.se.to_rows()),
         ];
-        // TODO could optimize by dropping indicies that are no longer needed
+        // TODO could optimize by dropping indices that are no longer needed
         for _ in 0..steps {
             step_rows_once(&mut rows);
         }
@@ -346,9 +346,9 @@ fn unshape_center(n: u64, s: u64) -> u64 {
 }
 
 fn step_rows_once(rows: &mut [u64; 4]) {
-    // isn't necessarilly very optimized, but it will take a lot of staring at generated asm to find something better
+    // isn't necessarily very optimized, but it will take a lot of staring at generated asm to find something better
     // in particular it may be that shifting data up 1 row (left by 16 bits) each call can both use less registers (only need 2 values for each call to step_row)
-    // and omiting calls that produce unused values: only need rows 1,2 for the last step; or even fewer, but more complicated, when shifting data
+    // and omitting calls that produce unused values: only need rows 1,2 for the last step; or even fewer, but more complicated, when shifting data
     let step_row_shift =
         |prev, row, next| step_row((prev << 48) | (row >> 16), row, (row << 16) | (next >> 48));
     *rows = [
@@ -399,7 +399,7 @@ fn step_row(above: u64, row: u64, below: u64) -> u64 {
 #[cfg(test)]
 #[allow(clippy::many_single_char_names)]
 mod tests {
-    use crate::{test_block, Block, Node};
+    use crate::{Block, Node, test_block};
 
     use super::{depth_to_max_steps, steps_to_min_depth};
     use std::num::NonZeroU64;

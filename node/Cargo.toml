@@ -1,15 +1,15 @@
 [package]
 name = "node"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 
 [dependencies]
 either = "1.13.0"
-itertools = "0.13.0"
-lru = "0.12.5"
+itertools = "0.15.0"
+lru = "0.19.0"
 proptest = "1.5.0"
 tracing = "0.1.40"
-weak-table = "0.3.2"
+weak-table = "0.4.0"
 
 [dev-dependencies]
 unindent = "0.2.3"

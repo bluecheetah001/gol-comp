@@ -1,14 +1,14 @@
 use std::collections::HashMap;
 use std::error::Error;
 use std::fmt::{Debug, Display};
-use std::io::{Error as IoError, Write};
+use std::io::{self, Write};
 
 use either::Either;
 
 use crate::{Block, DepthQuad, Node, Population};
 
 impl Node {
-    pub fn write_to(&self, write: impl Write) -> Result<(), IoError> {
+    pub fn write_to(&self, write: impl Write) -> Result<(), io::Error> {
         McWriter::new(write).write(self)
     }
     pub fn write_to_string(&self) -> String {
@@ -22,7 +22,7 @@ impl Node {
 
     // pub fn read_from(
     //     mut read: impl Read,
-    // ) -> Result<Result<Self, MacrocellError<Vec<u8>>>, IoError> {
+    // ) -> Result<Result<Self, MacrocellError<Vec<u8>>>, io::Error> {
     //     // api setup such that far down the road this could avoid reading everything in up front
     //     let mut buf = Vec::new();
     //     read.read_to_end(&mut buf)?;
@@ -54,16 +54,16 @@ impl<'n, W: Write> McWriter<'n, W> {
             last: 0,
         }
     }
-    fn write(mut self, node: &'n Node) -> Result<(), IoError> {
+    fn write(mut self, node: &'n Node) -> Result<(), io::Error> {
         self.write_header()?;
         self.write_node(node)
     }
-    fn write_header(&mut self) -> Result<(), IoError> {
+    fn write_header(&mut self) -> Result<(), io::Error> {
         writeln!(self.write, "[M2] (metalife 1.0)")?;
         writeln!(self.write, "#R B3/S23")?;
         Ok(())
     }
-    fn write_node(&mut self, node: &'n Node) -> Result<(), IoError> {
+    fn write_node(&mut self, node: &'n Node) -> Result<(), io::Error> {
         let size = node.width_log2();
         match node.depth_quad() {
             DepthQuad::Leaf(leaf) => {
@@ -83,7 +83,7 @@ impl<'n, W: Write> McWriter<'n, W> {
         }
         Ok(())
     }
-    fn maybe_write_node(&mut self, node: &'n Node) -> Result<usize, IoError> {
+    fn maybe_write_node(&mut self, node: &'n Node) -> Result<usize, io::Error> {
         match self.nodes.get(node) {
             Some(index) => Ok(*index),
             None if node.is_empty() => Ok(0),
@@ -95,7 +95,7 @@ impl<'n, W: Write> McWriter<'n, W> {
             }
         }
     }
-    fn maybe_write_block(&mut self, block: Block) -> Result<usize, IoError> {
+    fn maybe_write_block(&mut self, block: Block) -> Result<usize, io::Error> {
         match self.blocks.get(&block) {
             Some(index) => Ok(*index),
             None if block.is_empty() => Ok(0),
@@ -114,7 +114,7 @@ impl<'n, W: Write> McWriter<'n, W> {
             }
         }
     }
-    fn write_row(&mut self, row: u8) -> Result<(), IoError> {
+    fn write_row(&mut self, row: u8) -> Result<(), io::Error> {
         let mut buf = [b'.'; 9];
         let mut dollar = 0;
         #[allow(clippy::needless_range_loop)]
@@ -218,7 +218,7 @@ impl<S> MacrocellError<S> {
     }
 }
 // TODO not sure what the right generic constraint should be here to do this the right way
-impl<'src> MacrocellError<&'src [u8]> {
+impl MacrocellError<&'_ [u8]> {
     pub fn into_owned(self) -> MacrocellError<Vec<u8>> {
         MacrocellError(Box::new(MacrocellErrorData {
             line: self.0.line.into_owned(),
@@ -287,7 +287,7 @@ impl<'src> LineInfo<&'src [u8]> {
                 line_src_ptr >= src_ptr_range.start && line_src_ptr <= src_ptr_range.end,
                 "line is not in src"
             );
-            unsafe { line_src.as_ptr().sub_ptr(src.as_ptr()) }
+            unsafe { line_src.as_ptr().offset_from_unsigned(src.as_ptr()) }
         }
 
         let (line, line_offset, line_src) = src

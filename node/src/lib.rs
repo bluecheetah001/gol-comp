@@ -1,7 +1,3 @@
-#![feature(let_chains)]
-#![feature(assert_matches)]
-#![feature(type_alias_impl_trait)]
-#![feature(ptr_sub_ptr)]
 #![feature(iter_array_chunks)]
 #![feature(int_roundings)]
 #![feature(impl_trait_in_assoc_type)]
@@ -41,7 +37,6 @@ mod ops {
 
     pub use mc_format::*;
     pub use population::*;
-    pub use test_format::*;
 }
 
 pub use crate::node::*;

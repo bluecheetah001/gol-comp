@@ -11,7 +11,7 @@ impl Node {
     }
     fn trivial_bounding_rect(&self) -> Rect {
         let half_width = self.half_width();
-        Rect::symetric_min_max(-half_width, half_width - 1)
+        Rect::symmetric_min_max(-half_width, half_width - 1)
     }
 
     fn clip_in_bounds(&self, rect: Rect) -> Node {

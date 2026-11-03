@@ -61,12 +61,12 @@ pub struct Rect {
     y: Side,
 }
 impl Rect {
-    pub const EVERYTHING: Self = Self::symetric_min_max(i64::MIN, i64::MAX);
-    pub const NOTHING: Self = Self::symetric_min_max(i64::MAX, i64::MIN);
+    pub const EVERYTHING: Self = Self::symmetric_min_max(i64::MIN, i64::MAX);
+    pub const NOTHING: Self = Self::symmetric_min_max(i64::MAX, i64::MIN);
     const fn from_sides(x: Side, y: Side) -> Self {
         Self { x, y }
     }
-    pub const fn symetric_min_max(min: i64, max: i64) -> Self {
+    pub const fn symmetric_min_max(min: i64, max: i64) -> Self {
         let side = Side::min_max(min, max);
         Self::from_sides(side, side)
     }

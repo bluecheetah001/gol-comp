@@ -41,7 +41,7 @@ impl Node {
 // but I don't really want to have to bring in a bunch of different traits, I'd like the crate to just export
 // Node, direct methods, and raw data (which only have constructors and destructors)
 // although some methods (like these) do directly apply to Quad and Block, many have some sort of initialization that only makes sense for Node
-// Pos and Rect will have direct methods, but they are mostly separate from the Node, DepthQuad, Quad, Block heirarchy
+// Pos and Rect will have direct methods, but they are mostly separate from the Node, DepthQuad, Quad, Block hierarchy
 
 impl Quad<Node> {
     fn flip_h(&self) -> Quad<Node> {

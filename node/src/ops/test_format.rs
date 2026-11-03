@@ -16,7 +16,6 @@ macro_rules! test_node {
         $crate::Node::from_test_format($s)
     };
 }
-pub use {test_block, test_node};
 
 impl Block {
     /// expects 8 lines of '.'s (dead) and 'o's (alive)

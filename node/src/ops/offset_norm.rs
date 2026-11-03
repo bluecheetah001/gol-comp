@@ -12,7 +12,7 @@ impl Node {
         (pos + pos2, node)
     }
 
-    /// layed out in reading order just like Block
+    /// laid out in reading order just like Block
     /// padded to 16 bits so that this can be shifted and unioned with 3 other nodes
     /// high bits
     ///  0  0  0  0

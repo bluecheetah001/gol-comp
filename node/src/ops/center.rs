@@ -3,7 +3,7 @@
 use crate::{Block, DepthQuad, Node, Quad};
 
 impl Node {
-    // TODO center_at_depth is more efficnet if you can determine the goal depth ahead of time
+    // TODO center_at_depth is more efficient if you can determine the goal depth ahead of time
     pub(crate) fn expand(&self) -> Node {
         self.expand_quad().into()
     }
