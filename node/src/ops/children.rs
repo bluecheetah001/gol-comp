@@ -2,7 +2,7 @@
 
 use crate::{Block, DepthQuad, Node, Quad};
 impl<'n> Quad<&'n Node> {
-    pub(crate) fn children(&self) -> DepthQuad<&'n Quad<Block>, &'n Quad<Node>> {
+    pub fn children(&self) -> DepthQuad<&'n Quad<Block>, &'n Quad<Node>> {
         match self.map(Node::depth_quad) {
             Quad {
                 nw: DepthQuad::Leaf(nw),

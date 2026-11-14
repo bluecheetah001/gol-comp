@@ -18,10 +18,10 @@ type NodeData = (DepthQuad<Block, Node>, u64);
 pub struct Node(Rc<NodeData>);
 
 impl Node {
-    pub(crate) const MAX_WIDTH_LOG2: u8 = 63;
+    pub const MAX_WIDTH_LOG2: u8 = 63;
     /// the offset between depth and `width_log2`
-    pub(crate) const MIN_WIDTH_LOG2: u8 = Block::WIDTH_LOG2 + 1;
-    pub(crate) const MAX_DEPTH: u8 = Node::MAX_WIDTH_LOG2 - Node::MIN_WIDTH_LOG2;
+    pub const MIN_WIDTH_LOG2: u8 = Block::WIDTH_LOG2 + 1;
+    pub const MAX_DEPTH: u8 = Node::MAX_WIDTH_LOG2 - Node::MIN_WIDTH_LOG2;
 
     fn new_impl(data: DepthQuad<Block, Node>) -> Self {
         assert!(data.depth() <= Node::MAX_DEPTH);

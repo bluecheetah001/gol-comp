@@ -22,6 +22,7 @@ mod quad;
 mod rect;
 mod ops {
     mod bit;
+    mod cache;
     mod center;
     mod children;
     mod clip;
@@ -32,9 +33,11 @@ mod ops {
     mod population;
     mod reduce;
     mod rotate;
+    mod serde;
     mod step;
     mod test_format;
 
+    pub use cache::*;
     pub use mc_format::*;
     pub use population::*;
 }

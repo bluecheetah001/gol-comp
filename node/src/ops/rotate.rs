@@ -44,7 +44,7 @@ impl Node {
 // Pos and Rect will have direct methods, but they are mostly separate from the Node, DepthQuad, Quad, Block hierarchy
 
 impl Quad<Node> {
-    fn flip_h(&self) -> Quad<Node> {
+    pub fn flip_h(&self) -> Quad<Node> {
         Quad {
             nw: self.ne.flip_h(),
             ne: self.nw.flip_h(),
@@ -52,7 +52,7 @@ impl Quad<Node> {
             se: self.sw.flip_h(),
         }
     }
-    fn flip_v(&self) -> Quad<Node> {
+    pub fn flip_v(&self) -> Quad<Node> {
         Quad {
             nw: self.sw.flip_v(),
             ne: self.se.flip_v(),
@@ -60,7 +60,7 @@ impl Quad<Node> {
             se: self.ne.flip_v(),
         }
     }
-    fn rotate_cw(&self) -> Quad<Node> {
+    pub fn rotate_cw(&self) -> Quad<Node> {
         Quad {
             nw: self.sw.rotate_cw(),
             ne: self.nw.rotate_cw(),
@@ -68,7 +68,7 @@ impl Quad<Node> {
             se: self.ne.rotate_cw(),
         }
     }
-    fn rotate_180(&self) -> Quad<Node> {
+    pub fn rotate_180(&self) -> Quad<Node> {
         Quad {
             nw: self.se.rotate_180(),
             ne: self.sw.rotate_180(),
@@ -76,7 +76,7 @@ impl Quad<Node> {
             se: self.nw.rotate_180(),
         }
     }
-    fn rotate_ccw(&self) -> Quad<Node> {
+    pub fn rotate_ccw(&self) -> Quad<Node> {
         Quad {
             nw: self.ne.rotate_ccw(),
             ne: self.se.rotate_ccw(),
@@ -87,7 +87,7 @@ impl Quad<Node> {
 }
 
 impl Quad<Block> {
-    fn flip_h(&self) -> Quad<Block> {
+    pub fn flip_h(&self) -> Quad<Block> {
         Quad {
             nw: self.ne.flip_h(),
             ne: self.nw.flip_h(),
@@ -95,7 +95,7 @@ impl Quad<Block> {
             se: self.sw.flip_h(),
         }
     }
-    fn flip_v(&self) -> Quad<Block> {
+    pub fn flip_v(&self) -> Quad<Block> {
         Quad {
             nw: self.sw.flip_v(),
             ne: self.se.flip_v(),
@@ -103,7 +103,7 @@ impl Quad<Block> {
             se: self.ne.flip_v(),
         }
     }
-    fn rotate_cw(&self) -> Quad<Block> {
+    pub fn rotate_cw(&self) -> Quad<Block> {
         Quad {
             nw: self.sw.rotate_cw(),
             ne: self.nw.rotate_cw(),
@@ -111,7 +111,7 @@ impl Quad<Block> {
             se: self.ne.rotate_cw(),
         }
     }
-    fn rotate_180(&self) -> Quad<Block> {
+    pub fn rotate_180(&self) -> Quad<Block> {
         Quad {
             nw: self.se.rotate_180(),
             ne: self.sw.rotate_180(),
@@ -119,7 +119,7 @@ impl Quad<Block> {
             se: self.nw.rotate_180(),
         }
     }
-    fn rotate_ccw(&self) -> Quad<Block> {
+    pub fn rotate_ccw(&self) -> Quad<Block> {
         Quad {
             nw: self.ne.rotate_ccw(),
             ne: self.se.rotate_ccw(),
@@ -130,7 +130,7 @@ impl Quad<Block> {
 }
 
 impl Block {
-    fn flip_h(self) -> Block {
+    pub fn flip_h(self) -> Block {
         let rows = self.to_rows();
         let rows =
             (rows & 0xf0_f0_f0_f0_f0_f0_f0_f0) >> 4 | (rows & 0x0f_0f_0f_0f_0f_0f_0f_0f) << 4;
@@ -140,7 +140,7 @@ impl Block {
             (rows & 0xaa_aa_aa_aa_aa_aa_aa_aa) >> 1 | (rows & 0x55_55_55_55_55_55_55_55) << 1;
         Self::from_rows(rows)
     }
-    fn flip_v(self) -> Block {
+    pub fn flip_v(self) -> Block {
         let rows = self.to_rows();
         let rows =
             (rows & 0xff_ff_ff_ff_00_00_00_00) >> 32 | (rows & 0x00_00_00_00_ff_ff_ff_ff) << 32;
@@ -153,13 +153,13 @@ impl Block {
     // TODO im pretty sure I know how to implement these directly now
     // rows = (rows & nw >> 4) | (rows & ne >> 32) | (rows & sw << 32) | (rows & se << 4)
     // and then 'recursing' into 2x2 and 1x1 blocks
-    fn rotate_cw(self) -> Block {
+    pub fn rotate_cw(self) -> Block {
         self.flip_d().flip_h()
     }
-    fn rotate_180(self) -> Block {
+    pub fn rotate_180(self) -> Block {
         self.flip_v().flip_h()
     }
-    fn rotate_ccw(self) -> Block {
+    pub fn rotate_ccw(self) -> Block {
         self.flip_d().flip_v()
     }
     fn flip_d(self) -> Block {

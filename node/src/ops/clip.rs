@@ -9,7 +9,7 @@ impl Node {
         rect.intersection(self.trivial_bounding_rect());
         self.clear_in_bounds(rect)
     }
-    fn trivial_bounding_rect(&self) -> Rect {
+    pub fn trivial_bounding_rect(&self) -> Rect {
         let half_width = self.half_width();
         Rect::symmetric_min_max(-half_width, half_width - 1)
     }

@@ -17,18 +17,10 @@ pub enum Quadrant {
 impl Quadrant {
     pub fn from_pos(pos: Pos) -> Self {
         if pos.y < 0 {
-            if pos.x < 0 {
-                Self::NW
-            } else {
-                Self::NE
-            }
+            if pos.x < 0 { Self::NW } else { Self::NE }
         } else {
             #[allow(clippy::collapsible_else_if)]
-            if pos.x < 0 {
-                Self::SW
-            } else {
-                Self::SE
-            }
+            if pos.x < 0 { Self::SW } else { Self::SE }
         }
     }
 

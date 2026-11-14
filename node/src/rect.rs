@@ -31,6 +31,9 @@ impl Side {
     fn max(&self) -> i64 {
         self.max
     }
+    fn len(&self) -> i64 {
+        self.max - self.min + 1
+    }
 
     fn extend(&mut self, a: i64) {
         self.min = self.min.min(a);
@@ -47,9 +50,24 @@ impl Side {
         self.max = self.max.min(other.max);
     }
 
-    fn offset(&mut self, a: i64) {
+    fn intersects(self, other: Side) -> bool {
+        if self.max < self.min || other.max < other.min {
+            return false;
+        }
+        if self.min <= other.min {
+            self.max >= other.min
+        } else {
+            other.max >= self.min
+        }
+    }
+    fn contains(self, a: i64) -> bool {
+        self.min <= a && a <= self.max
+    }
+
+    fn offset(mut self, a: i64) -> Self {
         self.min += a;
         self.max += a;
+        self
     }
 }
 
@@ -108,6 +126,12 @@ impl Rect {
     pub fn set_east(&mut self, value: i64) {
         self.x.max = value;
     }
+    pub fn width(&self) -> i64 {
+        self.x.len()
+    }
+    pub fn height(&self) -> i64 {
+        self.y.len()
+    }
 
     pub fn nw(&self) -> Pos {
         Pos::new(self.x.min(), self.y.min())
@@ -161,9 +185,15 @@ impl Rect {
         // }
     }
 
-    pub fn offset(&mut self, pos: Pos) {
-        self.x.offset(pos.x);
-        self.y.offset(pos.y);
+    pub fn intersects(self, other: Rect) -> bool {
+        self.x.intersects(other.x) && self.y.intersects(other.y)
+    }
+    pub fn contains(self, pos: Pos) -> bool {
+        self.x.contains(pos.x) && self.y.contains(pos.y)
+    }
+
+    pub fn offset(self, pos: Pos) -> Self {
+        Self::from_sides(self.x.offset(pos.x), self.y.offset(pos.y))
     }
 }
 

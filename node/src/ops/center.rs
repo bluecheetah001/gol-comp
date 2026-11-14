@@ -4,16 +4,16 @@ use crate::{Block, DepthQuad, Node, Quad};
 
 impl Node {
     // TODO center_at_depth is more efficient if you can determine the goal depth ahead of time
-    pub(crate) fn expand(&self) -> Node {
+    pub fn expand(&self) -> Node {
         self.expand_quad().into()
     }
-    pub(crate) fn expand_quad(&self) -> Quad<Node> {
+    pub fn expand_quad(&self) -> Quad<Node> {
         match self.depth_quad() {
             DepthQuad::Leaf(leaf) => leaf.expand(),
             DepthQuad::Inner(_, inner) => inner.clone().expand(),
         }
     }
-    pub(crate) fn center_at_depth(&self, depth: u8) -> Node {
+    pub fn center_at_depth(&self, depth: u8) -> Node {
         fn get_smaller(inner: Quad<&Node>, depth: u8) -> Node {
             match inner.children() {
                 DepthQuad::Leaf(leaf) => {
@@ -51,7 +51,7 @@ impl Node {
 
 impl Quad<&Node> {
     // a bit inconsistent with other methods, but all the places that use this want to own the result
-    pub(crate) fn center(&self) -> DepthQuad<Block, Node> {
+    pub fn center(&self) -> DepthQuad<Block, Node> {
         match self.children() {
             DepthQuad::Leaf(leaf) => DepthQuad::Leaf(leaf.center().copied()),
             DepthQuad::Inner(depth, inner) => DepthQuad::Inner(depth, inner.center().cloned()),
@@ -59,7 +59,7 @@ impl Quad<&Node> {
     }
 }
 impl Quad<Node> {
-    pub(crate) fn expand(self) -> Quad<Node> {
+    pub fn expand(self) -> Quad<Node> {
         let empty = Node::empty(self.nw.depth());
         Quad {
             nw: Node::new(empty.clone(), empty.clone(), empty.clone(), self.nw),
@@ -70,7 +70,7 @@ impl Quad<Node> {
     }
 }
 impl Quad<Block> {
-    pub(crate) fn expand(self) -> Quad<Node> {
+    pub fn expand(self) -> Quad<Node> {
         let empty = Block::empty();
         Quad {
             nw: Node::new(empty, empty, empty, self.nw),
@@ -83,7 +83,7 @@ impl Quad<Block> {
 
 impl Quad<Block> {
     #[allow(unused)]
-    pub(crate) fn center(&self) -> Block {
+    pub fn center(&self) -> Block {
         let nw = (self.nw.to_rows() & 0x00_00_00_00_0f_0f_0f_0f) << (4 * 8 + 4);
         let ne = (self.ne.to_rows() & 0x00_00_00_00_f0_f0_f0_f0) << (4 * 8 - 4);
         let sw = (self.sw.to_rows() & 0x0f_0f_0f_0f_00_00_00_00) >> (4 * 8 - 4);
@@ -93,7 +93,7 @@ impl Quad<Block> {
 }
 impl Block {
     // is only used for tests
-    pub(crate) fn expand(self) -> Quad<Block> {
+    pub fn expand(self) -> Quad<Block> {
         let bits = self.to_rows();
         let nw = Block::from_rows((bits & 0xf0_f0_f0_f0_00_00_00_00) >> (4 * 8 + 4));
         let ne = Block::from_rows((bits & 0x0f_0f_0f_0f_00_00_00_00) >> (4 * 8 - 4));
@@ -104,7 +104,7 @@ impl Block {
 }
 
 impl<'t, T> Quad<&'t Quad<T>> {
-    pub(crate) fn center(&self) -> Quad<&'t T> {
+    pub fn center(&self) -> Quad<&'t T> {
         Quad {
             nw: &self.nw.se,
             ne: &self.ne.sw,

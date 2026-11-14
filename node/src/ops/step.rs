@@ -1,33 +1,16 @@
-use lru::LruCache;
 use std::cell::RefCell;
-use std::num::{NonZeroU64, NonZeroUsize};
-use tracing::{trace, trace_span};
+use std::num::NonZeroU64;
 
+use crate::ops::cache::Cache;
 use crate::{Block, DepthQuad, Node, Population, Quad};
 
-const LRU_CACHE_SIZE: NonZeroUsize = NonZeroUsize::new(1 << 24).unwrap();
+pub const STEP_CACHE_SIZE: usize = 1 << 24;
 
 // TODO may want to store Either<Node,Block> results so the smallest cache is 16x16 instead of 32x32
 //      xor directly implement Quad<Quad<Block>>::step_center()
-struct StepCache {
-    lru: LruCache<(Node, NonZeroU64), Node>,
-    // it's a bit weird to store this 'globally' and periodically reset them
-    // but it means it won't be hard to modify reporting to dump this once a second or every 100 calls ect
-    // and with a bit of cleanup could track more interesting stats (like breaking this down per depth )
-    hit: u32,
-    miss: u32,
-}
-impl StepCache {
-    fn new() -> Self {
-        Self {
-            lru: LruCache::new(LRU_CACHE_SIZE),
-            hit: 0,
-            miss: 0,
-        }
-    }
-}
+type StepCache = Cache<(Node, NonZeroU64), Node>;
 thread_local! {
-    static STEP_CACHE: RefCell<StepCache> = RefCell::new(StepCache::new());
+    static STEP_CACHE: RefCell<StepCache> = RefCell::new(StepCache::new("Node::step", STEP_CACHE_SIZE));
 }
 
 /// depth of 0 is a 16x16 area and can conceptually step 4 times
@@ -44,7 +27,7 @@ fn steps_to_min_depth(steps: NonZeroU64) -> u8 {
     if steps.get() <= Block::WIDTH {
         1
     } else {
-        #[allow(clippy::cast_possible_truncation)] // max from ilog2 is 32
+        #[allow(clippy::cast_possible_truncation, reason = "max from ilog2 is 32")]
         let floor = steps.ilog2() as u8 - (Block::WIDTH_LOG2 - 1);
         if steps.is_power_of_two() {
             floor
@@ -70,18 +53,8 @@ impl Node {
         let min_depth = steps_to_min_depth(steps);
         let depth = self.unbuffered_depth(min_depth - 1) + 2;
 
-        let _span = trace_span!("step", depth, steps).entered();
-
         let root = self.center_at_depth(depth);
-        STEP_CACHE.with_borrow_mut(|step_cache| {
-            let result = root.step_center(steps, step_cache);
-
-            trace!(step_cache.hit, step_cache.miss, "cache_perf");
-            step_cache.hit = 0;
-            step_cache.miss = 0;
-
-            result
-        })
+        Cache::with(&STEP_CACHE, |cache| root.step_center(steps, cache))
     }
     // find the smallest depth where the node is unbuffered, maxed with target_depth
     fn unbuffered_depth(&self, target_depth: u8) -> u8 {
@@ -135,22 +108,13 @@ where
 // recurse logic
 
 impl Node {
-    fn step_center(self, steps: NonZeroU64, step_cache: &mut StepCache) -> Node {
+    fn step_center(self, steps: NonZeroU64, cache: &mut StepCache) -> Node {
         let key = (self, steps);
-        match step_cache.lru.get(&key) {
-            None => {
-                step_cache.miss += 1;
-                let result = key.0.step_center_impl(steps, step_cache);
-                step_cache.lru.put(key, result.clone());
-                result
-            }
-            Some(result) => {
-                step_cache.hit += 1;
-                result.clone()
-            }
-        }
+        cache.get_or_insert(key, |(node, steps), cache| {
+            node.step_center_impl(*steps, cache)
+        })
     }
-    fn step_center_impl(&self, steps: NonZeroU64, step_cache: &mut StepCache) -> Node {
+    fn step_center_impl(&self, steps: NonZeroU64, cache: &mut StepCache) -> Node {
         let max_steps = depth_to_max_steps(self.depth());
         debug_assert!(steps.get() <= max_steps);
         let first_half_steps = steps.get().saturating_sub(max_steps / 2);
@@ -166,18 +130,18 @@ impl Node {
             DepthQuad::Inner(_, inner) => inner
                 .cloned()
                 .overlaps_hood()
-                .map(|quad| quad.step_center(first_half_steps, step_cache))
+                .map(|quad| quad.step_center(first_half_steps, cache))
                 .overlaps_quad()
-                .map(|quad| quad.step_center(second_half_steps, step_cache))
+                .map(|quad| quad.step_center(second_half_steps, cache))
                 .into(),
         }
     }
 }
 impl Quad<Node> {
-    fn step_center(self, steps: u64, step_cache: &mut StepCache) -> Node {
+    fn step_center(self, steps: u64, cache: &mut StepCache) -> Node {
         match NonZeroU64::new(steps) {
             None => self.as_ref().center().into(),
-            Some(steps) => Node::from(self).step_center(steps, step_cache),
+            Some(steps) => Node::from(self).step_center(steps, cache),
         }
     }
 }

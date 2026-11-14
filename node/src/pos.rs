@@ -1,7 +1,7 @@
 //! Raw types to name indicies to what would otherwise be fixed length arrays
 
 use std::fmt::Debug;
-use std::ops::{Add, Neg, Sub};
+use std::ops::{Add, Div, Mul, Neg, Sub};
 
 use crate::Quadrant;
 
@@ -23,7 +23,7 @@ impl Pos {
         }
     }
     /// adds given amount to self to be closer to 0,0
-    pub(crate) fn re_center(self, amount: i64) -> Self {
+    pub fn re_center(self, amount: i64) -> Self {
         Self {
             x: self.x + if self.x < 0 { amount } else { -amount },
             y: self.y + if self.y < 0 { amount } else { -amount },
@@ -60,6 +60,24 @@ impl Neg for Pos {
         Self {
             x: -self.x,
             y: -self.y,
+        }
+    }
+}
+impl Mul<i64> for Pos {
+    type Output = Self;
+    fn mul(self, rhs: i64) -> Self::Output {
+        Self {
+            x: self.x * rhs,
+            y: self.y * rhs,
+        }
+    }
+}
+impl Div<i64> for Pos {
+    type Output = Self;
+    fn div(self, rhs: i64) -> Self::Output {
+        Self {
+            x: self.x / rhs,
+            y: self.y / rhs,
         }
     }
 }

@@ -1,24 +1,12 @@
 use std::cell::RefCell;
-use std::num::NonZeroUsize;
 
-use lru::LruCache;
-
+use crate::ops::cache::Cache;
 use crate::{Block, DepthQuad, Node, Population, Quad};
 
-const LRU_CACHE_SIZE: NonZeroUsize = NonZeroUsize::new(1 << 8).unwrap();
-
-struct ReduceCache {
-    to_depth: LruCache<(Node, u8), Node>,
-}
-impl ReduceCache {
-    fn new() -> Self {
-        Self {
-            to_depth: LruCache::new(LRU_CACHE_SIZE),
-        }
-    }
-}
+pub const REDUCE_CACHE_SIZE: usize = 1 << 8;
+type ReduceCache = Cache<(Node, u8), Node>;
 thread_local! {
-    static REDUCE_CACHE: RefCell<ReduceCache> = RefCell::new(ReduceCache::new());
+    static REDUCE_CACHE: RefCell<ReduceCache> = RefCell::new(Cache::new("Node::reduce_by", REDUCE_CACHE_SIZE));
 }
 
 impl Node {
@@ -27,40 +15,25 @@ impl Node {
             return self.clone();
         }
         let depth = self.depth();
-        REDUCE_CACHE.with_borrow_mut(|reduce_cache| {
+        REDUCE_CACHE.with_borrow_mut(|cache| {
             if amount > depth {
-                self.center_at_depth(amount).reduce_to(0, reduce_cache)
+                self.center_at_depth(amount).reduce_to(0, cache)
             } else {
-                self.reduce_to(depth - amount, reduce_cache)
+                self.reduce_to(depth - amount, cache)
             }
         })
     }
-    fn reduce_to(&self, depth: u8, reduce_cache: &mut ReduceCache) -> Self {
-        // TODO annoying that this needs a clone here rather than just before putting
-        // but fixing it requires a more clever LRU implementation (like IndexMap's Equivalent)
-        // `step_center` has a similar problem, but is is able to take an owned Node
-        let key = (self.clone(), depth);
-        match reduce_cache.to_depth.get(&key) {
-            None => {
-                // reduce_cache.miss += 1;
-                let result = key.0.reduce_to_impl(depth, reduce_cache);
-                reduce_cache.to_depth.put(key, result.clone());
-                result
-            }
-            Some(result) => {
-                // reduce_cache.hit += 1;
-                result.clone()
-            }
-        }
+    fn reduce_to(&self, depth: u8, cache: &mut ReduceCache) -> Self {
+        cache.get_or_insert((self.clone(), depth), |(node, depth), cache| {
+            node.reduce_to_impl(*depth, cache)
+        })
     }
-    fn reduce_to_impl(&self, depth: u8, reduce_cache: &mut ReduceCache) -> Self {
-        let inner = self.inner().expect("to.depth to be < self.depth").as_ref();
+    fn reduce_to_impl(&self, depth: u8, cache: &mut ReduceCache) -> Self {
+        let inner = self.inner().expect("depth to be < self.depth").as_ref();
         if depth == 0 {
             inner.map(Node::reduce_to_block).into()
         } else {
-            inner
-                .map(|node| node.reduce_to(depth - 1, reduce_cache))
-                .into()
+            inner.map(|node| node.reduce_to(depth - 1, cache)).into()
         }
     }
     // this is still a decent amount of (constant) work, should it be memoized?
