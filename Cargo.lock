@@ -99,14 +99,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "gui"
-version = "0.1.0"
-dependencies = [
- "node",
- "wasm-bindgen",
-]
-
-[[package]]
 name = "hashbrown"
 version = "0.16.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -509,6 +501,14 @@ checksum = "5eba2ec791141b0bf4db542f6b038a8f9310cee33e076cb181245780b09a24ff"
 dependencies = [
  "cfg-if",
  "hashbrown 0.16.1",
+]
+
+[[package]]
+name = "web"
+version = "0.1.0"
+dependencies = [
+ "node",
+ "wasm-bindgen",
 ]
 
 [[package]]

@@ -1,7 +1,11 @@
+#![feature(float_conversions)]
+
 use std::num::NonZeroU64;
 
 use node::{Block, Node, Population, Pos, Quadrant, Rect};
+use wasm_bindgen::prelude::*;
 
+#[wasm_bindgen]
 pub struct Viewer {
     original_base: Node,
     original_actual: Node,
@@ -14,12 +18,10 @@ pub struct Viewer {
     // zoom: i8,
     center: Pos,
 }
-impl Default for Viewer {
-    fn default() -> Self {
-        Self::new()
-    }
-}
+#[wasm_bindgen]
 impl Viewer {
+    #[wasm_bindgen(constructor)]
+    #[allow(clippy::new_without_default, reason = "is only for wasm")]
     pub fn new() -> Self {
         let empty = Node::empty(0);
         Self {
@@ -44,15 +46,19 @@ impl Viewer {
         self.actual = self.original_actual.step(self.steps_in_period());
         Ok(())
     }
-    pub fn set_period(&mut self, period: Option<NonZeroU64>) {
+    pub fn set_period(&mut self, period: Option<f64>) -> Result<(), String> {
+        let period = period.map(check_positive_u64).transpose()?;
         let prev_steps_in_period = self.steps_in_period();
         self.period = period;
         self.update_nodes(prev_steps_in_period);
+        Ok(())
     }
-    pub fn set_step(&mut self, step: u64) {
+    pub fn set_step(&mut self, step: f64) -> Result<(), String> {
+        let step = check_u64(step)?;
         let prev_steps_in_period = self.steps_in_period();
         self.step = step;
         self.update_nodes(prev_steps_in_period);
+        Ok(())
     }
     fn steps_in_period(&self) -> u64 {
         if let Some(period) = self.period {
@@ -73,15 +79,16 @@ impl Viewer {
         }
     }
 
-    pub fn set_canvas_size(&mut self, canvas_width: i64, canvas_height: i64) -> Result<(), String> {
-        if canvas_width <= 0 || canvas_height <= 0 {
-            return Err("width and height must be positive".into());
-        }
-        self.canvas_size = Pos::new(canvas_width, canvas_height);
+    pub fn set_canvas_size(&mut self, canvas_width: f64, canvas_height: f64) -> Result<(), String> {
+        self.canvas_size = Pos::new(
+            check_positive_i64(canvas_width)?,
+            check_positive_i64(canvas_height)?,
+        );
         Ok(())
     }
-    pub fn set_center(&mut self, x: i64, y: i64) {
-        self.center = Pos::new(x, y);
+    pub fn set_center(&mut self, x: f64, y: f64) -> Result<(), String> {
+        self.center = Pos::new(check_i64(x)?, check_i64(y)?);
+        Ok(())
     }
     pub fn get_rgba(&self) -> Vec<u8> {
         let depth = self.base.depth().max(self.actual.depth());
@@ -90,10 +97,52 @@ impl Viewer {
 
         // for now assuming pixels are cells
         let min = self.center - (self.canvas_size / 2);
-        let max = min + self.canvas_size;
+        let max = min + self.canvas_size - Pos::new(1, 1);
         let view = Rect::min_max(min, max);
         ImageBuilder::new(view).fill(&base, &actual).into_rgba()
     }
+}
+
+fn check_u64(val: f64) -> Result<u64, String> {
+    if val < 0.0 || val.is_nan() {
+        return Err("Must be non-negative".to_owned());
+    }
+    let int_val: u64 = val.to_int_saturating();
+    if int_val as f64 != val {
+        // technically this is looser, but error is good enough
+        return Err("Must be a safe integer".to_owned());
+    }
+    Ok(int_val)
+}
+fn check_positive_u64(val: f64) -> Result<NonZeroU64, String> {
+    if val <= 0.0 || val.is_nan() {
+        return Err("Must be positive".to_owned());
+    }
+    let int_val: u64 = val.to_int_saturating();
+    if int_val as f64 != val {
+        // technically this is looser, but error is good enough
+        return Err("Must be a safe integer".to_owned());
+    }
+    Ok(NonZeroU64::try_from(int_val).unwrap())
+}
+fn check_positive_i64(val: f64) -> Result<i64, String> {
+    if val <= 0.0 || val.is_nan() {
+        return Err("Must be positive".to_owned());
+    }
+    let int_val: i64 = val.to_int_saturating();
+    if int_val as f64 != val {
+        // technically this is looser, but error is good enough
+        return Err("Must be a safe integer".to_owned());
+    }
+    Ok(int_val)
+}
+fn check_i64(val: f64) -> Result<i64, String> {
+    let int_val: i64 = val.to_int_saturating();
+    if int_val as f64 != val {
+        // technically this is looser, but error is good enough
+        return Err("Must be a safe integer".to_owned());
+    }
+    Ok(int_val)
 }
 
 struct ImageBuilder {
