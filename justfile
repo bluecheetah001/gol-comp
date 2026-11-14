@@ -10,6 +10,10 @@ build:
     cargo build --release --target wasm32-unknown-unknown -p web
     wasm-bindgen --target web --out-dir web/static/gen --out-name lib target/wasm32-unknown-unknown/release/web.wasm
 
+build-dev:
+    cargo build --target wasm32-unknown-unknown -p web
+    wasm-bindgen --target web --keep-debug --out-dir web/static/gen --out-name lib target/wasm32-unknown-unknown/debug/web.wasm
+
 host:
     miniserve web/static --index index.html -i 127.0.0.1 -p 8000
 

@@ -5,6 +5,17 @@ use std::num::NonZeroU64;
 use node::{Block, Node, Population, Pos, Quadrant, Rect};
 use wasm_bindgen::prelude::*;
 
+#[wasm_bindgen(start)]
+pub fn start() {
+    console_error_panic_hook::set_once();
+    let config = tracing_wasm::WASMLayerConfigBuilder::new()
+        .set_max_level(tracing::Level::TRACE)
+        .set_report_logs_in_timings(false)
+        .build();
+    tracing_wasm::set_as_global_default_with_config(config);
+    tracing::info!("Wasm logging and panic hook initialized");
+}
+
 #[wasm_bindgen]
 pub struct Viewer {
     original_base: Node,
@@ -184,16 +195,16 @@ impl ImageBuilder {
         {
             return;
         }
-        let half_width = base.half_width();
+        let quarter_width = base.half_width() / 2;
         match (base.depth_quad(), actual.depth_quad()) {
             (node::DepthQuad::Inner(_, base), node::DepthQuad::Inner(_, actual)) => {
                 for q in Quadrant::iter_all() {
-                    self.fill_at(&base[q], &actual[q], pos + Pos::in_dir(q, half_width));
+                    self.fill_at(&base[q], &actual[q], pos + Pos::in_dir(q, quarter_width));
                 }
             }
             (node::DepthQuad::Leaf(base), node::DepthQuad::Leaf(actual)) => {
                 for q in Quadrant::iter_all() {
-                    self.fill_block(base[q], actual[q], pos + Pos::in_dir(q, half_width));
+                    self.fill_block(base[q], actual[q], pos + Pos::in_dir(q, quarter_width));
                 }
             }
             _ => panic!("inconsistent depth"),
@@ -204,8 +215,9 @@ impl ImageBuilder {
             return;
         }
         self.fill_pixels(base, 1, pos);
-        self.fill_pixels(actual.and_not(base), 2, pos);
-        self.fill_pixels(base.and_not(actual), 4, pos);
+        // self.fill_pixels(actual.and_not(base), 2, pos);
+        // self.fill_pixels(base.and_not(actual), 4, pos);
+        self.fill_pixels(actual, 2, pos);
     }
     fn fill_pixels(&mut self, block: Block, mask: u8, pos: Pos) {
         for local_pos in block.iter_alive() {

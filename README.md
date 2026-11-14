@@ -38,6 +38,27 @@ the period; `set_period(4)` sets it, and `0` throws. Methods returning `Result`
 throw on `Err`. `get_rgba()` returns a
 `Uint8Array`. Call `viewer.free()` when finished with the instance.
 
+## Browser logging and panics
+
+`await init()` automatically installs `tracing-wasm` at `TRACE` level and
+`console_error_panic_hook`. Open the browser console to see the initialization
+message, Rust `tracing::info!`/`debug!`/`trace!` events (including cache reports),
+and panic messages with their Rust source location and a browser-captured stack.
+The entry script requests up to 50 stack frames on engines that support
+`Error.stackTraceLimit`. Panics still abort the Wasm call; reload after a panic.
+
+Run `just build` and refresh to pick up Rust changes. For less optimized stacks
+with debug information retained, build with:
+
+```powershell
+cargo +nightly build -p web --target wasm32-unknown-unknown
+wasm-bindgen --target web --keep-debug --out-dir web/static/gen --out-name lib target/wasm32-unknown-unknown/debug/web.wasm
+```
+
+Rust source-level stepping depends on browser support for Wasm debug information;
+the panic hook itself does not generate source maps. To reduce log volume, change
+`set_max_level` in `web/src/lib.rs` to `tracing::Level::INFO`.
+
 ## GUI help
 - can move display by dragging with right mouse button
 - can zoom in with `I` and out with `O` when focused on board

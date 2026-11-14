@@ -20,8 +20,8 @@ try {
   viewer.set_center(0, 0);
   viewer.set_period(undefined);
   viewer.set_step(0);
-  viewer.load_base(await fetch_pattern("./pattern/fill.mc"));
-  // viewer.load_actual(await fetch_pattern("./pattern/and-not+cross.mc"));
+  viewer.load_base(await fetch_pattern("./pattern/cross.mc"));
+  viewer.load_actual(await fetch_pattern("./pattern/and-not+cross.mc"));
   const rgba = viewer.get_rgba();
   console.log(rgba.length);
   // TODO verify llm
