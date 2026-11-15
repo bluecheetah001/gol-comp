@@ -62,7 +62,7 @@ impl Block {
         BitIter::from(self.to_rows()).map(|bit| {
             let bit_col = (bit % 8) as i64;
             let bit_row = (bit / 8) as i64;
-            Pos::new(3 - bit_col, -4 + bit_row)
+            Pos::new(3 - bit_col, 3 - bit_row)
         })
     }
 }

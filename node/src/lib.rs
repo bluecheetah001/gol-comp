@@ -1,5 +1,4 @@
 #![feature(iter_array_chunks)]
-#![feature(int_roundings)]
 #![feature(impl_trait_in_assoc_type)]
 // lints
 #![warn(clippy::pedantic)]
