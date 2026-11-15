@@ -10,7 +10,8 @@ build:
     cargo build --release --target wasm32-unknown-unknown -p web
     wasm-bindgen --target web --out-dir web/gen --out-name lib target/wasm32-unknown-unknown/release/web.wasm
     npm ci
-    npx esbuild web/src/index.js --bundle --minify --format=esm --outfile=web/static/bundle.js
+    npx tsc -p web/tsconfig.json
+    npx esbuild web/src/index.ts --bundle --minify --format=esm --outfile=web/static/bundle.js
     # esbuild doesn't pick up dynamic import of wasm files
     cp web/gen/lib_bg.wasm web/static
 
@@ -18,7 +19,8 @@ build-dev:
     cargo build --target wasm32-unknown-unknown -p web
     wasm-bindgen --target web --keep-debug --out-dir web/gen --out-name lib target/wasm32-unknown-unknown/debug/web.wasm
     npm ci
-    npx esbuild web/src/index.js --bundle --sourcemap=inline --format=esm --outfile=web/static/bundle.js
+    npx tsc -p web/tsconfig.json
+    npx esbuild web/src/index.ts --bundle --sourcemap=inline --format=esm --outfile=web/static/bundle.js
     # esbuild doesn't pick up dynamic import of wasm files
     cp web/gen/lib_bg.wasm web/static
 
