@@ -1,3 +1,5 @@
 /target
-/web/static/gen
 /node_modules
+/web/gen
+/web/static/bundle.js
+/web/static/lib_bg.wasm

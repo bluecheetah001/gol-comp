@@ -1,10 +1,9 @@
-import init, { Viewer } from "./gen/lib.js";
+import init, { Viewer } from "../gen/lib.js";
 
 await init();
 
-async function fetch_pattern(name) {
+async function fetch_pattern(name: string): Promise<string> {
   const response = await fetch(name, { mode: "no-cors" });
-  // TODO verify llm
   if (!response.ok) {
     throw new Error(`Failed to load ${name}: HTTP ${response.status}`);
   }
@@ -23,13 +22,17 @@ try {
   viewer.load_base(await fetch_pattern("./pattern/cross.mc"));
   viewer.load_actual(await fetch_pattern("./pattern/and-not+cross.mc"));
   const rgba = viewer.get_rgba();
-  console.log(rgba.length);
-  // TODO verify llm
   const image = new ImageData(new Uint8ClampedArray(rgba), width, height);
-  const canvas = document.querySelector(".viewer");
+  const canvas = document.querySelector<HTMLCanvasElement>("canvas.viewer");
+  if (canvas == null) {
+    throw new Error("failed to find viewer canvas");
+  }
   canvas.width = width;
   canvas.height = height;
   const context = canvas.getContext("2d");
+  if (context == null) {
+    throw new Error("failed to get 2d context");
+  }
   context.putImageData(image, 0, 0);
 } catch (e) {
   console.error(e);
